@@ -1,18 +1,30 @@
-// Solana Place Pixel Art Embedder - Optimized for 100 requests/60s
-// Uses existing wallet connection from the UI
+// Solana Place Pixel Art Embedder
 
-class OptimizedPixelEmbedder {
+
+class SimplePixelEmbedder {
   constructor() {
     this.queue = [];
     this.isPlacing = false;
-    this.placementDelay = 650; // 650ms = ~92 requests/60s (leaves buffer for safety)
-    this.burstDelay = 100; // Very short delay between rapid placements
     this.pixelsPlaced = 0;
     this.errors = 0;
     this.skipped = 0;
-    this.rateLimitBuffer = 8; // Keep 8 requests as buffer
-    this.maxRequestsPerMinute = 100 - this.rateLimitBuffer; // 92 requests/minute safely
-    this.requestTimes = []; // Track request timing
+    
+    // Smart rate limiting based on tier with burst control
+    this.baseDelay = 800; // Default conservative delay
+    this.tierDelays = {
+      'Admin': 600,     // 100 pixels/minute (respects burst limit)
+      'Mega': 600,      // 100 pixels/minute  
+      'Ultra': 750,     // 80 pixels/minute
+      'Premium': 1000,  // 60 pixels/minute
+      'Basic': 1500,    // 40 pixels/minute
+      'Free': 2500      // 24 pixels/minute
+    };
+    this.currentTier = 'unknown';
+    
+    // Burst control - respect 20 pixels per 10 seconds server limit
+    this.burstTracker = [];
+    this.maxBurstPixels = 18; // Stay under 20 pixel limit
+    this.requestTimes = [];
     
     // Get existing socket connection from the app
     this.socket = window.socket || null;
@@ -26,39 +38,80 @@ class OptimizedPixelEmbedder {
     }
     
     console.log('✅ Found existing socket connection');
-    console.log(`🚀 Optimized for ${this.maxRequestsPerMinute} pixels/minute (${this.placementDelay}ms delay)`);
+    console.log('🛡️ Will detect your tier and optimize delays automatically');
+    
+    // Listen for rate limit info to optimize delays
+    this.socket.on('rate_limit_info', (info) => {
+      this.handleRateLimitInfo(info);
+    });
+    
+    // Get initial rate limit status
+    this.socket.emit('get_rate_limit_status');
+    
     return true;
   }
 
-  // Smart rate limiting - burst fast, then slow down if needed
+  // Handle server rate limit feedback
+  handleRateLimitInfo(info) {
+    if (info && info.tier) {
+      this.currentTier = info.tier;
+      
+      // Use tier-specific delay if available
+      if (this.tierDelays[info.tier]) {
+        this.baseDelay = this.tierDelays[info.tier];
+        console.log(`🎯 Detected ${info.tier} tier - using ${this.baseDelay}ms delays`);
+        
+        const pixelsPerMinute = Math.floor(60000 / this.baseDelay);
+        console.log(`⚡ Optimized speed: ~${pixelsPerMinute} pixels/minute (respects 20/10s burst limit)`);
+      }
+      
+      // Show rate limit info
+      if (info.maxPixels) {
+        console.log(`📊 Rate limit: ${info.remaining || 0}/${info.maxPixels} remaining`);
+      }
+    }
+  }
+
+  // Smart delay with burst limit protection
   async smartDelay() {
     const now = Date.now();
     
     // Clean old request times (older than 60 seconds)
     this.requestTimes = this.requestTimes.filter(time => now - time < 60000);
     
-    // If we're close to rate limit, use longer delay
-    if (this.requestTimes.length >= this.maxRequestsPerMinute - 5) {
-      const oldestRequest = Math.min(...this.requestTimes);
-      const waitTime = 60000 - (now - oldestRequest) + 100; // Wait until oldest request is 60s old + buffer
+    // Clean burst tracker (older than 10 seconds)
+    this.burstTracker = this.burstTracker.filter(time => now - time < 10000);
+    
+    // Check if we're approaching burst limit
+    if (this.burstTracker.length >= this.maxBurstPixels) {
+      // Wait until oldest burst request is 10+ seconds old
+      const oldestBurst = Math.min(...this.burstTracker);
+      const waitTime = 10000 - (now - oldestBurst) + 200; // Extra 200ms buffer
       
       if (waitTime > 0) {
-        console.log(`⚠️ Near rate limit, waiting ${Math.ceil(waitTime/1000)}s...`);
+        console.log(`🛑 Burst limit protection: waiting ${Math.ceil(waitTime/1000)}s...`);
         await this.sleep(waitTime);
-        return;
+        
+        // Clean burst tracker after waiting
+        this.burstTracker = this.burstTracker.filter(time => Date.now() - time < 10000);
       }
     }
     
-    // Normal operation - use short delay
-    await this.sleep(this.placementDelay);
+    // Add jitter to prevent thundering herd
+    const jitter = Math.random() * 100; // 0-100ms jitter
+    const delay = this.baseDelay + jitter;
+    
+    await this.sleep(delay);
   }
 
-  // Track request timing
+  // Track request timing including burst tracking
   recordRequest() {
-    this.requestTimes.push(Date.now());
+    const now = Date.now();
+    this.requestTimes.push(now);
+    this.burstTracker.push(now);
   }
 
-  // Load and process image
+  // Load and process image (same as original)
   async loadImage(file, startX, startY, maxWidth = 100) {
     console.log(`🖼️ Processing image: ${file.name}`);
     console.log(`📍 Target position: (${startX}, ${startY})`);
@@ -108,8 +161,10 @@ class OptimizedPixelEmbedder {
           }
         }
         
+        const pixelsPerMinute = Math.floor(60000 / this.baseDelay);
+        const estimatedMinutes = Math.ceil(pixels.length / pixelsPerMinute);
         console.log(`🎨 Extracted ${pixels.length} pixels from image`);
-        console.log(`⏱️ Estimated time: ${Math.ceil(pixels.length / this.maxRequestsPerMinute)} minutes (at ${this.maxRequestsPerMinute} pixels/min)`);
+        console.log(`⏱️ Estimated time: ${estimatedMinutes} minutes at ~${pixelsPerMinute} pixels/min (${this.currentTier} tier)`);
         resolve(pixels);
       };
       
@@ -122,7 +177,7 @@ class OptimizedPixelEmbedder {
     });
   }
 
-  // Optimized pixel checking using region API
+  // Pixel checking using region API (same as original)
   async checkPixelsInRegion(pixels) {
     if (pixels.length === 0) return [];
 
@@ -163,15 +218,15 @@ class OptimizedPixelEmbedder {
         } else if (response.status === 429) {
           console.log(`⚠️ Rate limited on region check, adding all pixels from region`);
           pixelsToPlace.push(...region.pixels);
-          await this.sleep(2000);
+          await this.sleep(3000); // Longer wait for rate limits
         } else {
           console.log(`⚠️ Could not check region, adding all pixels from region`);
           pixelsToPlace.push(...region.pixels);
         }
         
-        // Small delay between region checks
+        // Delay between region checks
         if (i < regions.length - 1) {
-          await this.sleep(200);
+          await this.sleep(500);
         }
         
       } catch (error) {
@@ -184,7 +239,7 @@ class OptimizedPixelEmbedder {
     return pixelsToPlace;
   }
 
-  // Group pixels into regions for efficient API calls
+  // Group pixels into regions (same as original)
   groupPixelsIntoRegions(pixels, regionSize = 50) {
     const regions = [];
     const regionMap = new Map();
@@ -210,7 +265,7 @@ class OptimizedPixelEmbedder {
     return Array.from(regionMap.values());
   }
 
-  // Use the existing socket to place a pixel
+  // Place pixel using existing socket (same as original)
   async placePixel(x, y, color) {
     return new Promise((resolve, reject) => {
       const event = new CustomEvent('placePixelFromScript', {
@@ -224,7 +279,7 @@ class OptimizedPixelEmbedder {
           resolved = true;
           reject(new Error('Pixel placement timeout'));
         }
-      }, 5000); // Reduced timeout for faster operation
+      }, 8000); // Longer timeout for reliability
       
       const successHandler = (e) => {
         if (!resolved) {
@@ -232,7 +287,7 @@ class OptimizedPixelEmbedder {
           clearTimeout(timeout);
           document.removeEventListener('pixelPlacedSuccess', successHandler);
           document.removeEventListener('pixelPlacedError', errorHandler);
-          this.recordRequest(); // Track successful request
+          this.recordRequest();
           resolve();
         }
       };
@@ -259,9 +314,9 @@ class OptimizedPixelEmbedder {
             if (!resolved) {
               resolved = true;
               clearTimeout(timeout);
-              window.socket.off('pixel_placed', onSuccess);
-              window.socket.off('error', onError);
-              this.recordRequest(); // Track successful request
+              window.socket.off('pixel_placed_success', onSuccess);
+              window.socket.off('pixel_placement_failed', onError);
+              this.recordRequest();
               resolve();
             }
           };
@@ -270,31 +325,40 @@ class OptimizedPixelEmbedder {
             if (!resolved) {
               resolved = true;
               clearTimeout(timeout);
-              window.socket.off('pixel_placed', onSuccess);
-              window.socket.off('error', onError);
-              reject(new Error(error.message));
+              window.socket.off('pixel_placed_success', onSuccess);
+              window.socket.off('pixel_placement_failed', onError);
+              reject(new Error(error.error || error.message || 'Pixel placement failed'));
             }
           };
           
-          window.socket.once('pixel_placed', onSuccess);
-          window.socket.once('error', onError);
+          window.socket.once('pixel_placed_success', onSuccess);
+          window.socket.once('pixel_placement_failed', onError);
           window.socket.emit('place_pixel', { x, y, color });
         }
-      }, 100);
+      }, 200);
     });
   }
 
-  // Embed image with optimized rate limiting
+  // Main embedding function
   async embedImage(pixels, checkExisting = true) {
-    console.log(`🚀 Starting FAST image embedding...`);
+    console.log(`🚀 Starting image embedding...`);
     console.log(`🔍 Check existing pixels: ${checkExisting}`);
-    console.log(`⚡ Speed: ~${this.maxRequestsPerMinute} pixels/minute`);
+    console.log(`🎯 Using ${this.baseDelay}ms delays for ${this.currentTier} tier`);
 
     if (this.isPlacing) {
       console.log('❌ Already placing pixels. Stop current operation first.');
       return;
     }
 
+    // Get fresh rate limit info before starting
+    if (this.socket) {
+      this.socket.emit('get_rate_limit_status');
+      await this.sleep(300); // Brief pause for response
+    }
+
+    // Reset counters
+    this.pixelsPlaced = 0;
+    this.errors = 0;
     this.skipped = 0;
     let finalPixels = pixels;
 
@@ -305,8 +369,6 @@ class OptimizedPixelEmbedder {
         console.log('⚠️ Error during region check, proceeding with all pixels:', error.message);
         finalPixels = pixels;
       }
-    } else if (checkExisting) {
-      finalPixels = pixels;
     }
 
     if (finalPixels.length === 0) {
@@ -317,13 +379,16 @@ class OptimizedPixelEmbedder {
     this.queue = [...finalPixels];
     this.isPlacing = true;
     
-    console.log(`🎯 Starting FAST placement of ${this.queue.length} pixels...`);
-    console.log(`⏱️ Estimated time: ${Math.ceil(this.queue.length / this.maxRequestsPerMinute)} minutes`);
+    const pixelsPerMinute = Math.floor(60000 / this.baseDelay);
+    const estimatedTime = Math.ceil(this.queue.length / pixelsPerMinute);
+    
+    console.log(`🎯 Starting placement of ${this.queue.length} pixels...`);
+    console.log(`⏱️ Estimated time: ${estimatedTime} minutes at ~${pixelsPerMinute} pixels/min`);
 
     await this.processQueue();
   }
 
-  // Process the pixel queue with smart rate limiting
+  // Process queue with simple reliable approach
   async processQueue() {
     const startTime = Date.now();
     
@@ -334,14 +399,14 @@ class OptimizedPixelEmbedder {
         await this.placePixel(pixel.x, pixel.y, pixel.color);
         this.pixelsPlaced++;
         
-        // Show progress every 10 pixels or every 30 seconds
-        if (this.pixelsPlaced % 10 === 0 || (Date.now() - startTime) % 30000 < 1000) {
+        // Show progress every 10 pixels
+        if (this.pixelsPlaced % 10 === 0) {
           const elapsed = (Date.now() - startTime) / 1000;
           const rate = this.pixelsPlaced / (elapsed / 60);
-          console.log(`🎨 Pixel placed! (${pixel.x}, ${pixel.y}) Total: ${this.pixelsPlaced}, Queue: ${this.queue.length}, Rate: ${Math.round(rate)}/min`);
+          console.log(`🎨 Progress: ${this.pixelsPlaced} placed | Queue: ${this.queue.length} | Rate: ${Math.round(rate)}/min`);
         }
         
-        // Smart delay based on rate limiting
+        // Simple delay
         if (this.queue.length > 0) {
           await this.smartDelay();
         }
@@ -350,12 +415,22 @@ class OptimizedPixelEmbedder {
         this.errors++;
         console.error(`❌ Failed to place pixel at (${pixel.x}, ${pixel.y}):`, error.message);
         
-        // If it's a rate limit error, wait longer
-        if (error.message.includes('rate') || error.message.includes('limit')) {
-          console.log('⚠️ Rate limit hit, waiting longer...');
-          await this.sleep(5000);
+        // Handle different error types
+        if (error.message.toLowerCase().includes('burst limit')) {
+          console.log('🛑 Burst limit hit - entering extended cooldown');
+          // Clear burst tracker and wait longer
+          this.burstTracker = [];
+          await this.sleep(15000); // 15 second cooldown
+        } else if (error.message.toLowerCase().includes('rate') || error.message.toLowerCase().includes('limit')) {
+          console.log('⚠️ Rate limit hit - waiting 10 seconds');
+          await this.sleep(10000);
+        } else if (error.message.toLowerCase().includes('credit')) {
+          console.log('💰 Out of credits - stopping');
+          this.isPlacing = false;
+          break;
         } else {
-          await this.sleep(1000);
+          // Generic error - short pause
+          await this.sleep(2000);
         }
       }
     }
@@ -382,6 +457,8 @@ class OptimizedPixelEmbedder {
 
   // Get current status
   getStatus() {
+    const burstUsed = this.burstTracker.filter(time => Date.now() - time < 10000).length;
+    
     return {
       isPlacing: this.isPlacing,
       queueLength: this.queue.length,
@@ -389,7 +466,9 @@ class OptimizedPixelEmbedder {
       errors: this.errors,
       skipped: this.skipped,
       currentRate: this.requestTimes.length,
-      maxRate: this.maxRequestsPerMinute
+      tier: this.currentTier,
+      burstUsed: burstUsed,
+      burstLimit: this.maxBurstPixels
     };
   }
 
@@ -400,16 +479,16 @@ class OptimizedPixelEmbedder {
 }
 
 // ========================================
-// SIMPLE INTERFACE
+// SIMPLE INTERFACE (same as original)
 // ========================================
 
 let embedder = null;
 
 // Initialize
 function initEmbedder() {
-  console.log('🚀 Initializing FAST Pixel Embedder (100 req/60s)...');
-  embedder = new OptimizedPixelEmbedder();
-  console.log('✅ FAST Embedder ready! (~92 pixels/minute)');
+  console.log('🚀 Initializing Tier-Optimized Pixel Embedder...');
+  embedder = new SimplePixelEmbedder();
+  console.log('✅ Embedder ready! Will auto-detect your tier for optimal speed.');
   return embedder;
 }
 
@@ -447,7 +526,7 @@ function embedImage(startX = 100, startY = 100, maxWidth = 50) {
 
       console.log(`💰 Will place ${pixels.length} pixels at position (${startX}, ${startY})`);
       
-      const proceed = confirm(`FAST EMBED: ${pixels.length} pixels starting at (${startX}, ${startY})?\n\nThis will cost ${pixels.length} credits and take about ${Math.ceil(pixels.length / 92)} minutes.\n\n⚡ Optimized for your 100 req/60s rate limit!`);
+      const proceed = confirm(`EMBED: ${pixels.length} pixels starting at (${startX}, ${startY})?\n\nThis will cost ${pixels.length} credits.\n\n🎯 Will auto-detect your tier for optimal speed!`);
       
       if (proceed) {
         await embedder.embedImage(pixels, true);
@@ -465,14 +544,14 @@ function embedImage(startX = 100, startY = 100, maxWidth = 50) {
   input.click();
 }
 
-// Ultra fast embed without existing pixel check
-function embedImageUltraFast(startX = 100, startY = 100, maxWidth = 50) {
+// Fast embed without existing pixel check
+function embedImageFast(startX = 100, startY = 100, maxWidth = 50) {
   if (!embedder) {
     console.log('❌ Please run initEmbedder() first');
     return;
   }
 
-  console.log('📂 Opening file picker for ULTRA FAST embedding...');
+  console.log('📂 Opening file picker for FAST embedding...');
   
   const input = document.createElement('input');
   input.type = 'file';
@@ -496,7 +575,7 @@ function embedImageUltraFast(startX = 100, startY = 100, maxWidth = 50) {
         return;
       }
 
-      const proceed = confirm(`ULTRA FAST: ${pixels.length} pixels at (${startX}, ${startY})?\n\nWill NOT check existing pixels!\nEstimated time: ${Math.ceil(pixels.length / 92)} minutes at ~92 pixels/min`);
+      const proceed = confirm(`FAST EMBED: ${pixels.length} pixels at (${startX}, ${startY})?\n\nWill NOT check existing pixels!\n🎯 Auto-detects your tier for optimal speed!`);
       
       if (proceed) {
         await embedder.embedImage(pixels, false);
@@ -512,8 +591,8 @@ function embedImageUltraFast(startX = 100, startY = 100, maxWidth = 50) {
   input.click();
 }
 
-// Center embedding function optimized for 1000x1000 canvas
-function embedAtCenter(maxWidth = 333) {
+// Center embedding function
+function embedAtCenter(maxWidth = 200) {
   const canvasSize = 1000;
   const centerX = Math.floor((canvasSize - maxWidth) / 2);
   const centerY = Math.floor((canvasSize - maxWidth) / 2);
@@ -522,13 +601,13 @@ function embedAtCenter(maxWidth = 333) {
   embedImage(centerX, centerY, maxWidth);
 }
 
-function embedAtCenterFast(maxWidth = 333) {
+function embedAtCenterFast(maxWidth = 200) {
   const canvasSize = 1000;
   const centerX = Math.floor((canvasSize - maxWidth) / 2);
   const centerY = Math.floor((canvasSize - maxWidth) / 2);
   
   console.log(`🎯 FAST centering image at (${centerX}, ${centerY}) with max size ${maxWidth}px`);
-  embedImageUltraFast(centerX, centerY, maxWidth);
+  embedImageFast(centerX, centerY, maxWidth);
 }
 
 function showStatus() {
@@ -539,7 +618,7 @@ function showStatus() {
   
   const status = embedder.getStatus();
   console.log('📊 Current Status:', status);
-  console.log(`⚡ Rate: ${status.currentRate}/${status.maxRate} requests in last 60s`);
+  console.log(`🛑 Burst: ${status.burstUsed}/${status.burstLimit} in last 10s`);
   return status;
 }
 
@@ -549,39 +628,16 @@ function stopEmbedding() {
   }
 }
 
-console.log(`
-🚀 ULTRA-FAST SOLANA PLACE PIXEL EMBEDDER 🚀
-Optimized for 100 requests/60 seconds rate limit!
-
-⚡ SPEED IMPROVEMENTS:
-- 650ms delay between pixels (~92 pixels/minute)
-- Smart rate limiting with burst capability
-- Real-time rate limit tracking and adjustment
-- 9x faster than original 6-second delay!
-
-🎯 COMMANDS:
-initEmbedder()                       // Initialize FAST embedder
-embedAtCenter(333)                   // Center 1/3 size image (RECOMMENDED)
-embedAtCenterFast(333)              // Center without existing pixel check
-embedImage(x, y, size)              // Custom position with checking
-embedImageUltraFast(x, y, size)     // Custom position no checking
-
-📊 MONITORING:
-showStatus()                        // Check progress & rate limiting
-stopEmbedding()                     // Stop operation
-
-💡 FOR 1000x1000 CANVAS CENTER:
-- embedAtCenter(333) = 1/3 size centered image
-- Will place at position (334, 334) automatically
-- Estimated time: ~4 minutes for 333x333 image
-
-Ready! Run initEmbedder() then embedAtCenter(333) to start!
-`);
+// Simple startup message
+console.log('🚀 BURST-SAFE SOLANA PLACE PIXEL EMBEDDER 🚀');
+console.log('🛑 Respects 20 pixels per 10 seconds burst limit');
+console.log('🎯 Auto-detects your tier for optimal safe speed');
+console.log('✅ Ready! Run initEmbedder() then embedAtCenter(200) to start!');
 
 // Export functions
 window.initEmbedder = initEmbedder;
 window.embedImage = embedImage;
-window.embedImageUltraFast = embedImageUltraFast;
+window.embedImageFast = embedImageFast;
 window.embedAtCenter = embedAtCenter;
 window.embedAtCenterFast = embedAtCenterFast;
 window.showStatus = showStatus;
