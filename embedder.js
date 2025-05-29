@@ -1,6 +1,5 @@
 // Solana Place Pixel Art Embedder
 
-
 class SimplePixelEmbedder {
   constructor() {
     this.queue = [];
@@ -8,6 +7,7 @@ class SimplePixelEmbedder {
     this.pixelsPlaced = 0;
     this.errors = 0;
     this.skipped = 0;
+    this.currentCredits = null;
     
     // Smart rate limiting based on tier with burst control
     this.baseDelay = 800; // Default conservative delay
@@ -23,12 +23,86 @@ class SimplePixelEmbedder {
     
     // Burst control - respect 20 pixels per 10 seconds server limit
     this.burstTracker = [];
-    this.maxBurstPixels = 18; // Stay under 20 pixel limit
+    this.maxBurstPixels = 18;
     this.requestTimes = [];
     
     // Get existing socket connection from the app
     this.socket = window.socket || null;
     this.checkConnection();
+  }
+
+  // Get current credits from HTML display
+  getCurrentCredits() {
+    try {
+      // Look for the credits display element
+      const creditElements = document.querySelectorAll('span.text-sm.font-medium');
+      
+      for (let element of creditElements) {
+        const text = element.textContent.trim();
+        if (text.includes('Credits') || text.includes('Credit')) {
+          // Extract number from text like "100 Credits"
+          const match = text.match(/(\d+)\s*Credits?/i);
+          if (match) {
+            this.currentCredits = parseInt(match[1]);
+            console.log(`💰 Current credits: ${this.currentCredits}`);
+            return this.currentCredits;
+          }
+        }
+      }
+      
+      const allElements = document.querySelectorAll('*');
+      for (let element of allElements) {
+        const text = element.textContent.trim();
+        if (text.match(/^\d+\s+Credits?$/i)) {
+          const match = text.match(/(\d+)/);
+          if (match) {
+            this.currentCredits = parseInt(match[1]);
+            console.log(`💰 Current credits: ${this.currentCredits}`);
+            return this.currentCredits;
+          }
+        }
+      }
+      
+      console.log('⚠️ Could not find credits display in HTML');
+      return null;
+    } catch (error) {
+      console.log('⚠️ Error reading credits from HTML:', error.message);
+      return null;
+    }
+  }
+
+  // Check if user has enough credits and confirm if not
+  async checkCreditsAndConfirm(pixelsNeeded) {
+    const currentCredits = this.getCurrentCredits();
+    
+    if (currentCredits === null) {
+      console.log('⚠️ Could not determine current credits from page');
+      const proceed = confirm(
+        `Could not determine your current credits.\n\n` +
+        `This operation will use ${pixelsNeeded} credits.\n\n` +
+        `Do you want to proceed anyway?`
+      );
+      return proceed;
+    }
+    
+    if (currentCredits >= pixelsNeeded) {
+      console.log(`✅ Sufficient credits: ${currentCredits} available, ${pixelsNeeded} needed`);
+      return true;
+    } else {
+      console.log(`⚠️ Insufficient credits: ${currentCredits} available, ${pixelsNeeded} needed`);
+      const deficit = pixelsNeeded - currentCredits;
+      
+      const proceed = confirm(
+        `💰 INSUFFICIENT CREDITS WARNING!\n\n` +
+        `Current credits: ${currentCredits}\n` +
+        `Pixels needed: ${pixelsNeeded}\n` +
+        `Deficit: ${deficit} credits\n\n` +
+        `⚠️ You may run out of credits partway through!\n\n` +
+        `Do you want to proceed anyway?`
+      );
+      
+      return proceed;
+    }
   }
 
   checkConnection() {
@@ -111,7 +185,7 @@ class SimplePixelEmbedder {
     this.burstTracker.push(now);
   }
 
-  // Load and process image (same as original)
+  // Load and process image
   async loadImage(file, startX, startY, maxWidth = 100) {
     console.log(`🖼️ Processing image: ${file.name}`);
     console.log(`📍 Target position: (${startX}, ${startY})`);
@@ -177,7 +251,7 @@ class SimplePixelEmbedder {
     });
   }
 
-  // Pixel checking using region API (same as original)
+  // Pixel checking using region API
   async checkPixelsInRegion(pixels) {
     if (pixels.length === 0) return [];
 
@@ -239,7 +313,7 @@ class SimplePixelEmbedder {
     return pixelsToPlace;
   }
 
-  // Group pixels into regions (same as original)
+  // Group pixels into regions
   groupPixelsIntoRegions(pixels, regionSize = 50) {
     const regions = [];
     const regionMap = new Map();
@@ -253,8 +327,8 @@ class SimplePixelEmbedder {
         regionMap.set(regionKey, {
           x1: regionX,
           y1: regionY,
-          x2: Math.min(regionX + regionSize - 1, 999),
-          y2: Math.min(regionY + regionSize - 1, 999),
+          x2: Math.min(regionX + regionSize - 1, 2999),
+          y2: Math.min(regionY + regionSize - 1, 1999),
           pixels: []
         });
       }
@@ -265,7 +339,7 @@ class SimplePixelEmbedder {
     return Array.from(regionMap.values());
   }
 
-  // Place pixel using existing socket (same as original)
+  // Place pixel using existing socket
   async placePixel(x, y, color) {
     return new Promise((resolve, reject) => {
       const event = new CustomEvent('placePixelFromScript', {
@@ -279,7 +353,7 @@ class SimplePixelEmbedder {
           resolved = true;
           reject(new Error('Pixel placement timeout'));
         }
-      }, 8000); // Longer timeout for reliability
+      }, 8000);
       
       const successHandler = (e) => {
         if (!resolved) {
@@ -353,7 +427,7 @@ class SimplePixelEmbedder {
     // Get fresh rate limit info before starting
     if (this.socket) {
       this.socket.emit('get_rate_limit_status');
-      await this.sleep(300); // Brief pause for response
+      await this.sleep(300);
     }
 
     // Reset counters
@@ -365,6 +439,7 @@ class SimplePixelEmbedder {
     if (checkExisting && pixels.length > 10) {
       try {
         finalPixels = await this.checkPixelsInRegion(pixels);
+        console.log(`💰 Final pixels needed: ${finalPixels.length} (after filtering existing)`);
       } catch (error) {
         console.log('⚠️ Error during region check, proceeding with all pixels:', error.message);
         finalPixels = pixels;
@@ -388,7 +463,7 @@ class SimplePixelEmbedder {
     await this.processQueue();
   }
 
-  // Process queue with simple reliable approach
+  // Process queue
   async processQueue() {
     const startTime = Date.now();
     
@@ -403,10 +478,10 @@ class SimplePixelEmbedder {
         if (this.pixelsPlaced % 10 === 0) {
           const elapsed = (Date.now() - startTime) / 1000;
           const rate = this.pixelsPlaced / (elapsed / 60);
-          console.log(`🎨 Progress: ${this.pixelsPlaced} placed | Queue: ${this.queue.length} | Rate: ${Math.round(rate)}/min`);
+          const creditsRemaining = this.getCurrentCredits();
+          console.log(`🎨 Progress: ${this.pixelsPlaced} placed | Queue: ${this.queue.length} | Rate: ${Math.round(rate)}/min | Credits: ${creditsRemaining || 'Unknown'}`);
         }
         
-        // Simple delay
         if (this.queue.length > 0) {
           await this.smartDelay();
         }
@@ -415,7 +490,7 @@ class SimplePixelEmbedder {
         this.errors++;
         console.error(`❌ Failed to place pixel at (${pixel.x}, ${pixel.y}):`, error.message);
         
-        // Handle different error types
+        // Error types
         if (error.message.toLowerCase().includes('burst limit')) {
           console.log('🛑 Burst limit hit - entering extended cooldown');
           // Clear burst tracker and wait longer
@@ -447,17 +522,20 @@ class SimplePixelEmbedder {
 
   // Show completion summary
   showSummary() {
+    const finalCredits = this.getCurrentCredits();
     console.log('\n🎉 ===== PLACEMENT COMPLETE =====');
     console.log(`✅ Pixels placed: ${this.pixelsPlaced}`);
     console.log(`⏭️ Pixels skipped: ${this.skipped}`);
     console.log(`❌ Errors: ${this.errors}`);
     console.log(`📦 Remaining queue: ${this.queue.length}`);
+    console.log(`💰 Credits remaining: ${finalCredits || 'Unknown'}`);
     console.log('================================\n');
   }
 
   // Get current status
   getStatus() {
     const burstUsed = this.burstTracker.filter(time => Date.now() - time < 10000).length;
+    const currentCredits = this.getCurrentCredits();
     
     return {
       isPlacing: this.isPlacing,
@@ -468,7 +546,8 @@ class SimplePixelEmbedder {
       currentRate: this.requestTimes.length,
       tier: this.currentTier,
       burstUsed: burstUsed,
-      burstLimit: this.maxBurstPixels
+      burstLimit: this.maxBurstPixels,
+      credits: currentCredits
     };
   }
 
@@ -479,20 +558,27 @@ class SimplePixelEmbedder {
 }
 
 // ========================================
-// SIMPLE INTERFACE (same as original)
+// SIMPLE INTERFACE WITH CREDIT CHECKING
 // ========================================
 
 let embedder = null;
 
 // Initialize
 function initEmbedder() {
-  console.log('🚀 Initializing Tier-Optimized Pixel Embedder...');
+  console.log('🚀 Initializing Credit-Aware Pixel Embedder...');
   embedder = new SimplePixelEmbedder();
-  console.log('✅ Embedder ready! Will auto-detect your tier for optimal speed.');
+  console.log('✅ Embedder ready! Will check credits and auto-detect your tier.');
+  
+  // Show current credits on init
+  const credits = embedder.getCurrentCredits();
+  if (credits !== null) {
+    console.log(`💰 Current credits detected: ${credits}`);
+  }
+  
   return embedder;
 }
 
-// Embed image from file
+// Embed image from file with credit check in single popup
 function embedImage(startX = 100, startY = 100, maxWidth = 50) {
   if (!embedder) {
     console.log('❌ Please run initEmbedder() first');
@@ -524,9 +610,25 @@ function embedImage(startX = 100, startY = 100, maxWidth = 50) {
         return;
       }
 
-      console.log(`💰 Will place ${pixels.length} pixels at position (${startX}, ${startY})`);
+      // Get current credits and build confirmation message
+      const currentCredits = embedder.getCurrentCredits();
+      let message = `EMBED: ${pixels.length} pixels starting at (${startX}, ${startY})\n\n`;
       
-      const proceed = confirm(`EMBED: ${pixels.length} pixels starting at (${startX}, ${startY})?\n\nThis will cost ${pixels.length} credits.\n\n🎯 Will auto-detect your tier for optimal speed!`);
+      if (currentCredits !== null) {
+        message += `Current credits: ${currentCredits}\n`;
+        if (currentCredits < pixels.length) {
+          const deficit = pixels.length - currentCredits;
+          message += `⚠️ INSUFFICIENT CREDITS!\n`;
+          message += `Deficit: ${deficit} credits\n`;
+          message += `You may run out partway through!\n\n`;
+        }
+      } else {
+        message += `Could not detect current credits\n\n`;
+      }
+      
+      message += `Will check existing pixels first\nProceed with embedding?`;
+      
+      const proceed = confirm(message);
       
       if (proceed) {
         await embedder.embedImage(pixels, true);
@@ -544,7 +646,7 @@ function embedImage(startX = 100, startY = 100, maxWidth = 50) {
   input.click();
 }
 
-// Fast embed without existing pixel check
+// Fast embed with credit check
 function embedImageFast(startX = 100, startY = 100, maxWidth = 50) {
   if (!embedder) {
     console.log('❌ Please run initEmbedder() first');
@@ -575,7 +677,25 @@ function embedImageFast(startX = 100, startY = 100, maxWidth = 50) {
         return;
       }
 
-      const proceed = confirm(`FAST EMBED: ${pixels.length} pixels at (${startX}, ${startY})?\n\nWill NOT check existing pixels!\n🎯 Auto-detects your tier for optimal speed!`);
+      // Get current credits and build confirmation message
+      const currentCredits = embedder.getCurrentCredits();
+      let message = `FAST EMBED: ${pixels.length} pixels at (${startX}, ${startY})\n\n`;
+      
+      if (currentCredits !== null) {
+        message += `Current credits: ${currentCredits}\n`;
+        if (currentCredits < pixels.length) {
+          const deficit = pixels.length - currentCredits;
+          message += `⚠️ INSUFFICIENT CREDITS!\n`;
+          message += `Deficit: ${deficit} credits\n`;
+          message += `You may run out partway through!\n\n`;
+        }
+      } else {
+        message += `Could not detect current credits\n\n`;
+      }
+      
+      message += `Will NOT check existing pixels\nProceed with fast embedding?`;
+      
+      const proceed = confirm(message);
       
       if (proceed) {
         await embedder.embedImage(pixels, false);
@@ -593,18 +713,20 @@ function embedImageFast(startX = 100, startY = 100, maxWidth = 50) {
 
 // Center embedding function
 function embedAtCenter(maxWidth = 200) {
-  const canvasSize = 1000;
-  const centerX = Math.floor((canvasSize - maxWidth) / 2);
-  const centerY = Math.floor((canvasSize - maxWidth) / 2);
+  const canvasWidth = 3000;
+  const canvasHeight = 2000;
+  const centerX = Math.floor((canvasWidth - maxWidth) / 2);
+  const centerY = Math.floor((canvasHeight - maxWidth) / 2);
   
   console.log(`🎯 Centering image at (${centerX}, ${centerY}) with max size ${maxWidth}px`);
   embedImage(centerX, centerY, maxWidth);
 }
 
 function embedAtCenterFast(maxWidth = 200) {
-  const canvasSize = 1000;
-  const centerX = Math.floor((canvasSize - maxWidth) / 2);
-  const centerY = Math.floor((canvasSize - maxWidth) / 2);
+  const canvasWidth = 3000;
+  const canvasHeight = 2000;
+  const centerX = Math.floor((canvasWidth - maxWidth) / 2);
+  const centerY = Math.floor((canvasHeight - maxWidth) / 2);
   
   console.log(`🎯 FAST centering image at (${centerX}, ${centerY}) with max size ${maxWidth}px`);
   embedImageFast(centerX, centerY, maxWidth);
@@ -619,6 +741,7 @@ function showStatus() {
   const status = embedder.getStatus();
   console.log('📊 Current Status:', status);
   console.log(`🛑 Burst: ${status.burstUsed}/${status.burstLimit} in last 10s`);
+  console.log(`💰 Credits: ${status.credits || 'Unknown'}`);
   return status;
 }
 
@@ -628,8 +751,24 @@ function stopEmbedding() {
   }
 }
 
+function checkCredits() {
+  if (!embedder) {
+    console.log('❌ Please run initEmbedder() first');
+    return;
+  }
+  
+  const credits = embedder.getCurrentCredits();
+  if (credits !== null) {
+    console.log(`💰 Current credits: ${credits}`);
+  } else {
+    console.log('❌ Could not detect credits from page');
+  }
+  return credits;
+}
+
 // Simple startup message
-console.log('🚀 BURST-SAFE SOLANA PLACE PIXEL EMBEDDER 🚀');
+console.log('🚀 CREDIT-AWARE SOLANA PLACE PIXEL EMBEDDER 🚀');
+console.log('💰 Automatically checks credits before embedding');
 console.log('🛑 Respects 20 pixels per 10 seconds burst limit');
 console.log('🎯 Auto-detects your tier for optimal safe speed');
 console.log('✅ Ready! Run initEmbedder() then embedAtCenter(200) to start!');
@@ -642,3 +781,4 @@ window.embedAtCenter = embedAtCenter;
 window.embedAtCenterFast = embedAtCenterFast;
 window.showStatus = showStatus;
 window.stopEmbedding = stopEmbedding;
+window.checkCredits = checkCredits;
