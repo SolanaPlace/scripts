@@ -77,17 +77,23 @@ initEmbedder()
 ### Step 2: Choose Your Location
 Pick one of these commands based on where you want your image:
 
-#### 🎯 **Recommended: Pick Your Own Spot**
+#### 🎯 **For New Areas (Credit Saving)**
 ```javascript
-embedImage(x, y, size)
+embedImage(x, y, size)  // Skips pixels that are already correct
+```
+
+#### 🔥 **For Canvas Wars (Territory Claims)**  
+```javascript
+embedImageFast(x, y, size)  // Overwrites EVERYTHING - claim your territory!
 ```
 
 **Examples:**
 ```javascript
-embedImage(100, 100, 200)    // Top-left area (recommended!)
-embedImage(2200, 100, 150)   // Top-right area  
-embedImage(200, 1600, 180)   // Bottom area
-embedImage(2000, 800, 120)   // Right side
+// Peaceful placement (saves credits)
+embedImage(100, 100, 200)    
+
+// AGGRESSIVE TAKEOVER (costs more credits but dominates area)
+embedImageFast(2200, 100, 150)   
 ```
 
 #### 🏠 **Center (Warning: Crowded!)**
@@ -137,11 +143,14 @@ Let's place a 150px image in the top-right area:
 
 ### Core Functions
 - `initEmbedder()` - **Always run this first!**
-- `embedImage(x, y, size)` - Place image at specific coordinates
+- `embedImage(x, y, size)` - Place image, skip pixels that are already correct (saves credits)
 - `embedAtCenter(size)` - Place at canvas center (crowded!)
 
-### Fast Mode (Skip Duplicate Check)
-- `embedImageFast(x, y, size)` - Faster but may overwrite existing pixels
+### 🔥 Canvas War Mode (Overwrites Everything!)
+- `embedImageFast(x, y, size)` - **AGGRESSIVE MODE:** Places ALL pixels, overwrites existing art
+- `embedAtCenterFast(size)` - Fast mode at center (expect battles!)
+
+**💡 Canvas War Tip:** Use Fast mode to claim territory and overwrite enemy pixels!
 
 ### Monitoring & Control
 - `showStatus()` - Check progress and current settings
@@ -230,7 +239,7 @@ This **saves you credits** and **avoids conflicts** with existing art!
 
 ## ⚠️ Final Security Reminder
 
-**This embedder's timing has been optimized** to work with Solana Place's rate limiting system. The delays, burst limits, and safety margins have been carefully calculated.
+**This embedder's timing has been professionally optimized** to work with Solana Place's rate limiting system. The delays, burst limits, and safety margins have been carefully calculated.
 
 **DO NOT:**
 - ❌ Change delay values
@@ -253,12 +262,17 @@ This **saves you credits** and **avoids conflicts** with existing art!
 // 1. ALWAYS START HERE
 initEmbedder()
 
-// 2. CHOOSE YOUR LOCATION (pick one):
-embedImage(100, 100, 150)    // Top-left (recommended)
-embedImage(2200, 100, 150)   // Top-right (recommended)  
+// 2. CHOOSE YOUR MODE:
+
+// PEACEFUL MODE (saves credits):
+embedImage(100, 100, 150)    // Top-left 
+embedImage(2200, 100, 150)   // Top-right  
 embedImage(200, 1600, 150)   // Bottom-left
-embedImage(2000, 800, 150)   // Right side
-embedAtCenter(150)           // Center (crowded!)
+
+// 🔥 CANVAS WAR MODE (overwrites everything):
+embedImageFast(100, 100, 150)    // CLAIM top-left territory!
+embedImageFast(2200, 100, 150)   // ATTACK top-right!
+embedAtCenterFast(150)           // BATTLE for center!
 
 // 3. USEFUL COMMANDS:
 showStatus()      // Check progress
