@@ -671,8 +671,8 @@ function embedImageFast(startX = 100, startY = 100, maxWidth = 50) {
 }
 
 function embedAtCenter(maxWidth = 200) {
-  const canvasWidth = 3000;
-  const canvasHeight = 2000;
+  const canvasWidth = 1000;
+  const canvasHeight = 1000;
   const centerX = Math.floor((canvasWidth - maxWidth) / 2);
   const centerY = Math.floor((canvasHeight - maxWidth) / 2);
   
@@ -681,8 +681,8 @@ function embedAtCenter(maxWidth = 200) {
 }
 
 function embedAtCenterFast(maxWidth = 200) {
-  const canvasWidth = 3000;
-  const canvasHeight = 2000;
+  const canvasWidth = 1000;
+  const canvasHeight = 1000;
   const centerX = Math.floor((canvasWidth - maxWidth) / 2);
   const centerY = Math.floor((canvasHeight - maxWidth) / 2);
   
@@ -739,7 +739,7 @@ console.log('     - embedImage(100, 100, 150)  - Top-left area');
 console.log('     - embedImage(2000, 500, 100)  - Right side');
 console.log('     - embedImage(800, 1500, 200)  - Bottom area');
 console.log('');
-console.log('🎯 Canvas size: 3000x2000 pixels');
+console.log('🎯 Canvas size: 1000x1000 pixels');
 console.log('✅ Pick your spot and avoid the crowd!');
 
 // Export functions
