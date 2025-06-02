@@ -68,6 +68,8 @@ The Solana Place canvas is **3000 pixels wide** by **2000 pixels tall**. Think o
 
 ## 🚀 Quick Start Guide
 
+### Open Chrome/Firefox Console - Paste the embedder.js code
+
 ### Step 1: Initialize
 ```javascript
 initEmbedder()
