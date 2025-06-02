@@ -34,35 +34,35 @@
 
 ## 🎯 Understanding the Canvas
 
-The Solana Place canvas is **3000 pixels wide** by **2000 pixels tall**. Think of it like a giant grid:
+The Solana Place canvas is **1000 pixels wide** by **1000 pixels tall**. Think of it like a grid:
 
 ```
-(0,0) ────────────────────────────────────── (3000,0)
-  │                                              │
-  │               TOP AREA                       │
-  │          (good for headers)                  │
-  │                                              │
-  │    LEFT        CENTER         RIGHT          │
-  │   AREA         AREA           AREA           │
-  │ (less busy)   (crowded!)    (less busy)     │
-  │                                              │
-  │              BOTTOM AREA                     │
-  │           (good for signatures)              │
-  │                                              │
-(0,2000) ──────────────────────────────── (3000,2000)
+(0,0) ─────────────────────── (1000,0)
+  │                              │
+  │         TOP AREA             │
+  │      (good for headers)      │
+  │                              │
+  │  LEFT    CENTER    RIGHT     │
+  │  AREA     AREA     AREA      │
+  │(quieter)(crowded!)(quieter)  │
+  │                              │
+  │       BOTTOM AREA            │
+  │    (good for signatures)     │
+  │                              │
+(0,1000) ─────────────────── (1000,1000)
 ```
 
 ### 📍 Good Locations to Try:
 
 | Location | Coordinates | Why It's Good |
 |----------|-------------|---------------|
-| **Top Left** | `(100, 100, 200)` | Less crowded, visible |
-| **Top Right** | `(2200, 100, 200)` | Less crowded, visible |
-| **Left Side** | `(200, 800, 150)` | Moderate traffic |
-| **Right Side** | `(2000, 800, 150)` | Moderate traffic |
-| **Bottom Left** | `(300, 1600, 180)` | Good for signatures |
-| **Bottom Right** | `(2000, 1600, 180)` | Good for signatures |
-| **Center** | `(1400, 900, 200)` | ⚠️ Very crowded! |
+| **Top Left** | `(50, 50, 100)` | Less crowded, visible |
+| **Top Right** | `(750, 50, 100)` | Less crowded, visible |
+| **Left Side** | `(100, 400, 80)` | Moderate traffic |
+| **Right Side** | `(700, 400, 80)` | Moderate traffic |
+| **Bottom Left** | `(100, 750, 100)` | Good for signatures |
+| **Bottom Right** | `(700, 750, 100)` | Good for signatures |
+| **Center** | `(400, 400, 120)` | ⚠️ Very crowded! |
 
 ---
 
@@ -92,15 +92,15 @@ embedImageFast(x, y, size)  // Overwrites EVERYTHING - claim your territory!
 **Examples:**
 ```javascript
 // Peaceful placement (saves credits)
-embedImage(100, 100, 200)    
+embedImage(50, 50, 100)    
 
 // AGGRESSIVE TAKEOVER (costs more credits but dominates area)
-embedImageFast(2200, 100, 150)   
+embedImageFast(750, 50, 80)   
 ```
 
 #### 🏠 **Center (Warning: Crowded!)**
 ```javascript
-embedAtCenter(200)  // Places at (1400, 900) - expect conflicts!
+embedAtCenter(120)  // Places at (400, 400) - expect conflicts!
 ```
 
 ---
@@ -109,17 +109,17 @@ embedAtCenter(200)  // Places at (1400, 900) - expect conflicts!
 
 The `size` parameter is the **maximum width/height** of your image in pixels:
 
-- **50-100px**: Small icons, logos, signatures
-- **100-200px**: Medium artwork, detailed images  
-- **200-300px**: Large artwork (takes longer, uses more credits)
+- **30-60px**: Small icons, logos, signatures
+- **60-120px**: Medium artwork, detailed images  
+- **120-200px**: Large artwork (takes longer, uses more credits)
 
-**💡 Tip:** Start small (100px) to test, then go bigger if you like the result!
+**💡 Tip:** Start small (60px) to test, then go bigger if you like the result!
 
 ---
 
 ## 🎨 Step-by-Step Example
 
-Let's place a 150px image in the top-right area:
+Let's place a 100px image in the top-right area:
 
 1. **Initialize:**
    ```javascript
@@ -129,7 +129,7 @@ Let's place a 150px image in the top-right area:
 
 2. **Choose location:**
    ```javascript
-   embedImage(2200, 100, 150)
+   embedImage(750, 50, 100)
    ```
    *A file picker will open*
 
@@ -168,7 +168,7 @@ Let's place a 150px image in the top-right area:
 - ✅ Warn you if you don't have enough credits
 - ✅ Skip pixels that are already the correct color (saves credits!)
 
-**Example:** A 100x100 image = up to 10,000 credits (but usually much less after duplicate detection)
+**Example:** A 60x60 image = up to 3,600 credits (but usually much less after duplicate detection)
 
 ---
 
@@ -177,10 +177,10 @@ Let's place a 150px image in the top-right area:
 Before placing pixels, the script checks if they're already the right color:
 
 ```
-🔍 Checking 4 regions instead of 8,432 individual pixels...
-📊 Checking region 1/4...
-📊 Checking region 2/4...
-✅ Check complete: 3,247 pixels need placement, 5,185 already correct
+🔍 Checking 2 regions instead of 3,247 individual pixels...
+📊 Checking region 1/2...
+📊 Checking region 2/2...
+✅ Check complete: 1,832 pixels need placement, 1,415 already correct
 ```
 
 This **saves you credits** and **avoids conflicts** with existing art!
@@ -196,8 +196,8 @@ This **saves you credits** and **avoids conflicts** with existing art!
 
 **Example output:**
 ```
-🎨 50 placed | 3,197 remaining | 72/min | Credits: 6,050
-🎨 100 placed | 3,147 remaining | 74/min | Credits: 6,000
+🎨 50 placed | 1,782 remaining | 148/min | Credits: 4,250
+🎨 100 placed | 1,732 remaining | 151/min | Credits: 4,200
 ```
 
 ---
@@ -230,12 +230,14 @@ This **saves you credits** and **avoids conflicts** with existing art!
 ## 🎯 Pro Tips
 
 1. **🔍 Scout first:** Look at the canvas to find empty areas
-2. **📏 Start small:** Test with 100px before going bigger  
+2. **📏 Start small:** Test with 60px before going bigger  
 3. **⏰ Off-peak hours:** Less competition during non-US hours
 4. **💰 Credit management:** Check your balance with `checkCredits()`
 5. **🛑 Emergency stop:** Use `stopEmbedding()` if needed
 6. **🔐 Security:** Only use the official embedder - never modified versions
 7. **⚙️ Don't modify:** The timing is professionally optimized - changes cause rate limits
+8. **🎯 Strategic placement:** Corners and edges are less contested than center
+9. **🔄 Check existing art:** Use normal mode to avoid overwriting good art
 
 ---
 
@@ -267,14 +269,15 @@ initEmbedder()
 // 2. CHOOSE YOUR MODE:
 
 // PEACEFUL MODE (saves credits):
-embedImage(100, 100, 150)    // Top-left 
-embedImage(2200, 100, 150)   // Top-right  
-embedImage(200, 1600, 150)   // Bottom-left
+embedImage(50, 50, 80)       // Top-left 
+embedImage(750, 50, 80)      // Top-right  
+embedImage(100, 750, 80)     // Bottom-left
+embedImage(700, 750, 80)     // Bottom-right
 
 // 🔥 CANVAS WAR MODE (overwrites everything):
-embedImageFast(100, 100, 150)    // CLAIM top-left territory!
-embedImageFast(2200, 100, 150)   // ATTACK top-right!
-embedAtCenterFast(150)           // BATTLE for center!
+embedImageFast(50, 50, 80)      // CLAIM top-left territory!
+embedImageFast(750, 50, 80)     // ATTACK top-right!
+embedAtCenterFast(100)          // BATTLE for center!
 
 // 3. USEFUL COMMANDS:
 showStatus()      // Check progress
@@ -284,8 +287,32 @@ checkCredits()    // See credit balance
 
 ---
 
+## 🎨 Popular Starting Spots
+
+**For beginners (less crowded):**
+```javascript
+embedImage(50, 50, 60)      // Top-left corner
+embedImage(50, 800, 60)     // Bottom-left corner  
+embedImage(800, 50, 60)     // Top-right corner
+```
+
+**For medium projects:**
+```javascript
+embedImage(200, 200, 100)   // Left side
+embedImage(600, 200, 100)   // Right side
+embedImage(300, 700, 100)   // Bottom area
+```
+
+**For large projects (expect competition):**
+```javascript
+embedAtCenter(150)          // Dead center (chaos!)
+embedImage(300, 300, 200)   // Large central area
+```
+
+---
+
 ## 📝 License
 
 This project is open-source and available under the MIT License.
 
-**Happy pixel art creating! 🎨**
+**Happy pixel art creating on the 1000x1000 canvas! 🎨**
