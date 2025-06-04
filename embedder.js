@@ -8,6 +8,7 @@ class OptimizedPixelEmbedder {
     this.errors = 0;
     this.skipped = 0;
     this.currentCredits = null;
+    this.sessionId = null; // Track current session
     
     // SLOWER BUT BULLETPROOF: Increase delays to guarantee safety
     this.baseDelay = 400;  // 2.5 pixels/second (well under 5/sec limit)
@@ -28,7 +29,132 @@ class OptimizedPixelEmbedder {
     // Get existing socket connection
     this.socket = window.socket || null;
     this.checkConnection();
+    
+    // Check for existing session on startup
+    this.checkForExistingSession();
   }
+
+  // ========================================
+  // RESUME/PERSISTENCE FUNCTIONALITY
+  // ========================================
+
+  generateSessionId() {
+    return 'embed_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  }
+
+  saveProgress() {
+    if (!this.sessionId) return;
+    
+    const progressData = {
+      sessionId: this.sessionId,
+      queue: this.queue,
+      pixelsPlaced: this.pixelsPlaced,
+      errors: this.errors,
+      skipped: this.skipped,
+      timestamp: Date.now(),
+      isActive: this.isPlacing
+    };
+    
+    try {
+      localStorage.setItem('pixelEmbedder_progress', JSON.stringify(progressData));
+    } catch (error) {
+      console.log('⚠️ Could not save progress:', error.message);
+    }
+  }
+
+  loadProgress() {
+    try {
+      const saved = localStorage.getItem('pixelEmbedder_progress');
+      if (!saved) return null;
+      
+      const data = JSON.parse(saved);
+      
+      // Check if session is recent (within 24 hours)
+      const hoursSinceLastSave = (Date.now() - data.timestamp) / (1000 * 60 * 60);
+      if (hoursSinceLastSave > 24) {
+        this.clearProgress();
+        return null;
+      }
+      
+      return data;
+    } catch (error) {
+      console.log('⚠️ Could not load progress:', error.message);
+      return null;
+    }
+  }
+
+  clearProgress() {
+    try {
+      localStorage.removeItem('pixelEmbedder_progress');
+    } catch (error) {
+      console.log('⚠️ Could not clear progress:', error.message);
+    }
+  }
+
+  checkForExistingSession() {
+    const saved = this.loadProgress();
+    if (saved && saved.queue && saved.queue.length > 0) {
+      console.log('🔄 Found incomplete session from', new Date(saved.timestamp).toLocaleString());
+      console.log(`📊 Progress: ${saved.pixelsPlaced} placed, ${saved.queue.length} remaining`);
+      console.log('💡 Use resumeEmbedding() to continue, or clearSession() to start fresh');
+      return true;
+    }
+    return false;
+  }
+
+  resumeEmbedding() {
+    const saved = this.loadProgress();
+    if (!saved || !saved.queue || saved.queue.length === 0) {
+      console.log('❌ No session to resume');
+      return false;
+    }
+
+    if (this.isPlacing) {
+      console.log('❌ Already placing pixels. Stop current operation first.');
+      return false;
+    }
+
+    // Restore state
+    this.sessionId = saved.sessionId;
+    this.queue = saved.queue;
+    this.pixelsPlaced = saved.pixelsPlaced;
+    this.errors = saved.errors;
+    this.skipped = saved.skipped;
+
+    console.log(`🔄 Resuming session: ${saved.pixelsPlaced} completed, ${this.queue.length} remaining`);
+    
+    const proceed = confirm(
+      `Resume Previous Session?\n\n` +
+      `Pixels completed: ${saved.pixelsPlaced}\n` +
+      `Pixels remaining: ${this.queue.length}\n` +
+      `Last active: ${new Date(saved.timestamp).toLocaleString()}\n\n` +
+      `Continue embedding?`
+    );
+
+    if (proceed) {
+      this.isPlacing = true;
+      this.processQueue();
+      return true;
+    } else {
+      console.log('❌ Resume cancelled by user');
+      return false;
+    }
+  }
+
+  clearSession() {
+    this.clearProgress();
+    this.queue = [];
+    this.pixelsPlaced = 0;
+    this.errors = 0;
+    this.skipped = 0;
+    this.sessionId = null;
+    this.isPlacing = false;
+    console.log('🗑️ Session cleared');
+  }
+
+  // ========================================
+  // ORIGINAL FUNCTIONALITY (with resume support)
+  // ========================================
 
   getCurrentCredits() {
     try {
@@ -401,7 +527,8 @@ class OptimizedPixelEmbedder {
       await this.sleep(300);
     }
 
-    // Reset everything for clean start
+    // Create new session
+    this.sessionId = this.generateSessionId();
     this.pixelsPlaced = 0;
     this.errors = 0;
     this.skipped = 0;
@@ -432,6 +559,10 @@ class OptimizedPixelEmbedder {
     
     console.log(`🎯 Starting placement of ${this.queue.length} pixels...`);
     console.log(`⏱️ Estimated time: ${estimatedTime} minutes at 150 pixels/min`);
+    console.log(`💾 Progress will be saved automatically`);
+
+    // Save initial progress
+    this.saveProgress();
 
     await this.processQueue();
   }
@@ -449,6 +580,11 @@ class OptimizedPixelEmbedder {
         await this.placePixel(pixel.x, pixel.y, pixel.color);
         this.pixelsPlaced++;
         
+        // Save progress every 10 pixels
+        if (this.pixelsPlaced % 10 === 0) {
+          this.saveProgress();
+        }
+        
         // Progress every 50 pixels (less spam)
         if (this.pixelsPlaced % 50 === 0) {
           const elapsed = (Date.now() - startTime) / 1000;
@@ -460,6 +596,9 @@ class OptimizedPixelEmbedder {
       } catch (error) {
         this.errors++;
         console.error(`❌ Failed pixel at (${pixel.x}, ${pixel.y}):`, error.message);
+        
+        // Save progress after error
+        this.saveProgress();
         
         // Enhanced error handling
         if (error.message.toLowerCase().includes('burst limit')) {
@@ -480,12 +619,22 @@ class OptimizedPixelEmbedder {
     }
 
     this.isPlacing = false;
+    
+    // Clear progress if completed successfully
+    if (this.queue.length === 0) {
+      this.clearProgress();
+    } else {
+      // Save final state if stopped early
+      this.saveProgress();
+    }
+    
     this.showSummary();
   }
 
   stop() {
     console.log('🛑 Stopping pixel placement...');
     this.isPlacing = false;
+    // Progress will be saved in processQueue
   }
 
   showSummary() {
@@ -495,6 +644,12 @@ class OptimizedPixelEmbedder {
     console.log(`⏭️ Pixels skipped: ${this.skipped}`);
     console.log(`❌ Errors: ${this.errors}`);
     console.log(`💰 Credits remaining: ${finalCredits || 'Unknown'}`);
+    
+    if (this.queue.length > 0) {
+      console.log(`🔄 Pixels remaining: ${this.queue.length}`);
+      console.log(`💡 Use resumeEmbedding() to continue later`);
+    }
+    
     console.log('======================\n');
   }
 
@@ -513,7 +668,9 @@ class OptimizedPixelEmbedder {
       burstUsed: burstUsed,
       burstLimit: 15,
       credits: currentCredits,
-      delay: this.universalDelay
+      delay: this.universalDelay,
+      sessionId: this.sessionId,
+      hasResumableSession: this.loadProgress() !== null
     };
   }
 
@@ -523,7 +680,7 @@ class OptimizedPixelEmbedder {
 }
 
 // ========================================
-// INTERFACE
+// INTERFACE (Enhanced with Resume Functions)
 // ========================================
 
 let embedder = null;
@@ -587,7 +744,7 @@ function embedImage(startX = 100, startY = 100, maxWidth = 50) {
         message += `Could not detect current credits\n\n`;
       }
       
-      message += `Will check existing pixels first\nProceed with embedding?`;
+      message += `Will check existing pixels first\n💾 Progress will be saved for resume\nProceed with embedding?`;
       
       const proceed = confirm(message);
       
@@ -652,7 +809,7 @@ function embedImageFast(startX = 100, startY = 100, maxWidth = 50) {
         message += `Could not detect current credits\n\n`;
       }
       
-      message += `Will NOT check existing pixels\nProceed with fast embedding?`;
+      message += `Will NOT check existing pixels\n💾 Progress will be saved for resume\nProceed with fast embedding?`;
       
       const proceed = confirm(message);
       
@@ -690,6 +847,54 @@ function embedAtCenterFast(maxWidth = 200) {
   embedImageFast(centerX, centerY, maxWidth);
 }
 
+// ========================================
+// NEW RESUME FUNCTIONS
+// ========================================
+
+function resumeEmbedding() {
+  if (!embedder) {
+    console.log('❌ Please run initEmbedder() first');
+    return;
+  }
+  
+  return embedder.resumeEmbedding();
+}
+
+function clearSession() {
+  if (!embedder) {
+    console.log('❌ Please run initEmbedder() first');
+    return;
+  }
+  
+  embedder.clearSession();
+}
+
+function checkSession() {
+  if (!embedder) {
+    console.log('❌ Please run initEmbedder() first');
+    return;
+  }
+  
+  const saved = embedder.loadProgress();
+  if (saved && saved.queue && saved.queue.length > 0) {
+    console.log('📊 Resumable Session Found:');
+    console.log(`  • Pixels completed: ${saved.pixelsPlaced}`);
+    console.log(`  • Pixels remaining: ${saved.queue.length}`);
+    console.log(`  • Errors encountered: ${saved.errors}`);
+    console.log(`  • Last active: ${new Date(saved.timestamp).toLocaleString()}`);
+    console.log(`  • Session ID: ${saved.sessionId}`);
+    console.log('💡 Use resumeEmbedding() to continue');
+    return saved;
+  } else {
+    console.log('❌ No resumable session found');
+    return null;
+  }
+}
+
+// ========================================
+// ORIGINAL INTERFACE FUNCTIONS
+// ========================================
+
 function showStatus() {
   if (!embedder) {
     console.log('❌ Embedder not initialized');
@@ -701,6 +906,7 @@ function showStatus() {
   console.log(`🛡️ Burst: ${status.burstUsed}/15 in last 10s`);
   console.log(`⚡ Delay: ${status.delay}ms (2.5 pixels/sec)`);
   console.log(`💰 Credits: ${status.credits || 'Unknown'}`);
+  console.log(`🔄 Has resumable session: ${status.hasResumableSession}`);
   return status;
 }
 
@@ -726,8 +932,8 @@ function checkCredits() {
 }
 
 // Startup message
-console.log('🚀 Solana Place Pixel Embedder Ready');
-console.log('⚡ Speed: 150 pixels/min | 🛡️ Burst-safe: 15/10s');
+console.log('🚀 Solana Place Pixel Embedder Ready (with Resume Support)');
+console.log('⚡ Speed: 150 pixels/min | 🛡️ Burst-safe: 15/10s | 💾 Auto-save progress');
 console.log('');
 console.log('📍 USAGE:');
 console.log('1. initEmbedder()  - Initialize first');
@@ -739,8 +945,14 @@ console.log('     - embedImage(100, 100, 150)  - Top-left area');
 console.log('     - embedImage(2000, 500, 100)  - Right side');
 console.log('     - embedImage(800, 1500, 200)  - Bottom area');
 console.log('');
+console.log('🔄 RESUME FEATURES:');
+console.log('   • resumeEmbedding()  - Continue interrupted session');
+console.log('   • checkSession()     - View saved progress');
+console.log('   • clearSession()     - Delete saved progress');
+console.log('');
 console.log('🎯 Canvas size: 1000x1000 pixels');
 console.log('✅ Pick your spot and avoid the crowd!');
+console.log('💾 Progress automatically saved every 10 pixels');
 
 // Export functions
 window.initEmbedder = initEmbedder;
@@ -751,3 +963,6 @@ window.embedAtCenterFast = embedAtCenterFast;
 window.showStatus = showStatus;
 window.stopEmbedding = stopEmbedding;
 window.checkCredits = checkCredits;
+window.resumeEmbedding = resumeEmbedding;
+window.clearSession = clearSession;
+window.checkSession = checkSession;
