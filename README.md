@@ -29,6 +29,62 @@
 - **💰 Credit checking** - Warns you before running out of credits
 - **🔍 Duplicate detection** - Skips pixels that are already correct
 - **⚡ Optimized speed** - 150 pixels/minute placement rate
+- **💾 Auto-Resume** - Never lose progress from browser crashes or refreshes!
+
+---
+
+## 🔄 NEW: Resume Functionality
+
+**Never lose progress again!** The embedder now automatically saves your progress and can resume exactly where it left off.
+
+### 🛡️ Crash Protection Features:
+
+- **💾 Auto-Save**: Progress saved every 10 pixels automatically
+- **🔄 Resume Support**: Continue after browser refresh, crash, or disconnect
+- **📊 Session Tracking**: Each embedding session gets a unique ID
+- **⏰ Smart Expiry**: Sessions auto-expire after 24 hours
+- **🎯 Exact Resume**: Picks up at the exact pixel where you stopped
+
+### 🔄 Resume Commands:
+
+```javascript
+// Check if you have a saved session
+checkSession()
+
+// Resume where you left off
+resumeEmbedding()
+
+// Clear saved progress (start fresh)
+clearSession()
+```
+
+### 📱 How Resume Works:
+
+1. **Start embedding normally** with any embed command
+2. **If something goes wrong** (browser crash, refresh, disconnect):
+   ```javascript
+   initEmbedder()  // You'll see: "🔄 Found incomplete session..."
+   resumeEmbedding()  // Continue exactly where you left off!
+   ```
+3. **Automatic detection** - The script tells you when resumable sessions exist
+4. **Zero credit loss** - Resume uses the exact same queue, no wasted pixels
+
+### 💡 Resume Example:
+
+```javascript
+// After a browser crash:
+initEmbedder()
+// Output: "🔄 Found incomplete session from 12/4/2024, 3:45:23 PM"
+// Output: "📊 Progress: 150 placed, 300 remaining"
+
+checkSession()  // See detailed info
+// Output: "Pixels completed: 150"
+// Output: "Pixels remaining: 300" 
+// Output: "Last active: 12/4/2024, 3:45:23 PM"
+
+resumeEmbedding()  // Pick up where you left off!
+// Confirms and continues with remaining 300 pixels
+```
 
 ---
 
@@ -74,9 +130,14 @@ The Solana Place canvas is **1000 pixels wide** by **1000 pixels tall**. Think o
 ```javascript
 initEmbedder()
 ```
-*This sets up the script and detects your account tier*
+*This sets up the script and detects your account tier (and any resumable sessions!)*
 
-### Step 2: Choose Your Location
+### Step 2: Check for Resumable Sessions
+```javascript
+checkSession()  // Optional: see if you have incomplete work
+```
+
+### Step 3: Choose Your Location
 Pick one of these commands based on where you want your image:
 
 #### 🎯 **For New Areas (Credit Saving)**
@@ -126,27 +187,41 @@ Let's place a 100px image in the top-right area:
    initEmbedder()
    ```
    *You'll see: "✅ Embedder ready! Tuned for high-performance server."*
+   *And possibly: "🔄 Found incomplete session..." if you have saved progress*
 
-2. **Choose location:**
+2. **Handle any existing session:**
+   ```javascript
+   checkSession()        // Optional: view saved progress details
+   resumeEmbedding()     // If you want to continue previous work
+   // OR
+   clearSession()        // If you want to start fresh
+   ```
+
+3. **Choose location:**
    ```javascript
    embedImage(750, 50, 100)
    ```
    *A file picker will open*
 
-3. **Select your image** (PNG, JPG, JPEG)
+4. **Select your image** (PNG, JPG, JPEG)
 
-4. **Confirm** when prompted about credits
+5. **Confirm** when prompted about credits
 
-5. **Wait** as it places pixels automatically!
+6. **Wait** as it places pixels automatically (progress auto-saved every 10 pixels!)
 
 ---
 
 ## 🛠️ All Available Commands
 
 ### Core Functions
-- `initEmbedder()` - **Always run this first!**
+- `initEmbedder()` - **Always run this first!** (Detects resumable sessions)
 - `embedImage(x, y, size)` - Place image, skip pixels that are already correct (saves credits)
 - `embedAtCenter(size)` - Place at canvas center (crowded!)
+
+### 🔄 Resume Functions (NEW!)
+- `checkSession()` - **View saved progress details**
+- `resumeEmbedding()` - **Continue interrupted embedding**
+- `clearSession()` - **Delete saved progress and start fresh**
 
 ### 🔥 Canvas War Mode (Overwrites Everything!)
 - `embedImageFast(x, y, size)` - **AGGRESSIVE MODE:** Places ALL pixels, overwrites existing art
@@ -155,8 +230,8 @@ Let's place a 100px image in the top-right area:
 **💡 Canvas War Tip:** Use Fast mode to claim territory and overwrite enemy pixels!
 
 ### Monitoring & Control
-- `showStatus()` - Check progress and current settings
-- `stopEmbedding()` - Cancel current placement
+- `showStatus()` - Check progress and current settings (shows if resumable session exists)
+- `stopEmbedding()` - Cancel current placement (progress automatically saved)
 - `checkCredits()` - See your current credit balance
 
 ---
@@ -167,6 +242,7 @@ Let's place a 100px image in the top-right area:
 - ✅ Show you the total cost before starting
 - ✅ Warn you if you don't have enough credits
 - ✅ Skip pixels that are already the correct color (saves credits!)
+- ✅ **Save progress automatically** - never lose credits to crashes!
 
 **Example:** A 60x60 image = up to 3,600 credits (but usually much less after duplicate detection)
 
@@ -193,11 +269,13 @@ This **saves you credits** and **avoids conflicts** with existing art!
 - **Burst Protection:** Never exceeds 15 pixels per 10 seconds  
 - **Rate Limits:** Mathematically impossible to hit
 - **Progress Updates:** Every 50 pixels placed
+- **💾 Auto-Save:** Progress saved every 10 pixels (crash protection)
 
 **Example output:**
 ```
 🎨 50 placed | 1,782 remaining | 148/min | Credits: 4,250
 🎨 100 placed | 1,732 remaining | 151/min | Credits: 4,200
+💾 Progress will be saved automatically
 ```
 
 ---
@@ -225,6 +303,15 @@ This **saves you credits** and **avoids conflicts** with existing art!
 - **Check:** Did someone modify the timing code?
 - **Solution:** Re-download the official script
 
+### Lost Progress / Browser Crashed
+- **Solution:** Run `initEmbedder()` then `resumeEmbedding()`
+- **Check:** Use `checkSession()` to see saved progress details
+- **Note:** Sessions auto-expire after 24 hours
+
+### "No session to resume" 
+- **Cause:** No saved progress exists, or session expired (24+ hours old)
+- **Solution:** Start a new embedding with `embedImage()` or similar
+
 ---
 
 ## 🎯 Pro Tips
@@ -233,11 +320,14 @@ This **saves you credits** and **avoids conflicts** with existing art!
 2. **📏 Start small:** Test with 60px before going bigger  
 3. **⏰ Off-peak hours:** Less competition during non-US hours
 4. **💰 Credit management:** Check your balance with `checkCredits()`
-5. **🛑 Emergency stop:** Use `stopEmbedding()` if needed
+5. **🛑 Emergency stop:** Use `stopEmbedding()` if needed (progress saved automatically)
 6. **🔐 Security:** Only use the official embedder - never modified versions
 7. **⚙️ Don't modify:** The timing is professionally optimized - changes cause rate limits
 8. **🎯 Strategic placement:** Corners and edges are less contested than center
 9. **🔄 Check existing art:** Use normal mode to avoid overwriting good art
+10. **💾 Trust the auto-save:** Progress saved every 10 pixels - crashes won't hurt you!
+11. **🔄 Use resume wisely:** Continue big projects over multiple sessions
+12. **🗑️ Clean up:** Use `clearSession()` when starting completely new projects
 
 ---
 
@@ -266,7 +356,12 @@ This **saves you credits** and **avoids conflicts** with existing art!
 // 1. ALWAYS START HERE
 initEmbedder()
 
-// 2. CHOOSE YOUR MODE:
+// 2. CHECK FOR RESUMABLE WORK (optional)
+checkSession()         // View saved progress
+resumeEmbedding()      // Continue where you left off
+clearSession()         // Start completely fresh
+
+// 3. CHOOSE YOUR MODE:
 
 // PEACEFUL MODE (saves credits):
 embedImage(50, 50, 80)       // Top-left 
@@ -279,7 +374,7 @@ embedImageFast(50, 50, 80)      // CLAIM top-left territory!
 embedImageFast(750, 50, 80)     // ATTACK top-right!
 embedAtCenterFast(100)          // BATTLE for center!
 
-// 3. USEFUL COMMANDS:
+// 4. USEFUL COMMANDS:
 showStatus()      // Check progress
 stopEmbedding()   // Cancel if needed
 checkCredits()    // See credit balance
@@ -307,6 +402,36 @@ embedImage(300, 700, 100)   // Bottom area
 ```javascript
 embedAtCenter(150)          // Dead center (chaos!)
 embedImage(300, 300, 200)   // Large central area
+```
+
+---
+
+## 💾 Resume Workflow Examples
+
+### After Browser Crash:
+```javascript
+initEmbedder()
+// "🔄 Found incomplete session from 12/4/2024, 3:45:23 PM"
+// "📊 Progress: 150 placed, 300 remaining"
+
+resumeEmbedding()  // Continue automatically!
+```
+
+### Checking Saved Progress:
+```javascript
+checkSession()
+// "📊 Resumable Session Found:"
+// "  • Pixels completed: 150"
+// "  • Pixels remaining: 300"
+// "  • Last active: 12/4/2024, 3:45:23 PM"
+// "💡 Use resumeEmbedding() to continue"
+```
+
+### Starting Fresh:
+```javascript
+initEmbedder()
+clearSession()        // Remove any old progress
+embedImage(100, 100, 80)  // Start new project
 ```
 
 ---
