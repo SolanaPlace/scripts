@@ -30,60 +30,83 @@
 - **🔍 Duplicate detection** - Skips pixels that are already correct
 - **⚡ Optimized speed** - 150 pixels/minute placement rate
 - **💾 Auto-Resume** - Never lose progress from browser crashes or refreshes!
+- **🔧 Missing Pixel Recovery** - Ensures 100% image completion even after network errors!
 
 ---
 
-## 🔄 NEW: Resume Functionality
+## 🔄 NEW: Enhanced Resume with Missing Pixel Recovery
 
-**Never lose progress again!** The embedder now automatically saves your progress and can resume exactly where it left off.
+**Never lose progress or have incomplete images again!** The embedder now automatically saves your progress and can intelligently recover any pixels that failed to place.
 
-### 🛡️ Crash Protection Features:
+### 🛡️ Bulletproof Features:
 
 - **💾 Auto-Save**: Progress saved every 10 pixels automatically
-- **🔄 Resume Support**: Continue after browser refresh, crash, or disconnect
+- **🔄 Smart Resume**: Continue with automatic missing pixel detection
+- **🔧 Missing Pixel Recovery**: Finds and places pixels that failed due to network errors
 - **📊 Session Tracking**: Each embedding session gets a unique ID
 - **⏰ Smart Expiry**: Sessions auto-expire after 24 hours
-- **🎯 Exact Resume**: Picks up at the exact pixel where you stopped
+- **🎯 100% Completion**: Guarantees your image is always complete
 
-### 🔄 Resume Commands:
+### 🔧 How Missing Pixel Recovery Works:
+
+1. **Saves Complete Image**: Stores the full original pixel list for validation
+2. **Network Error Handling**: When pixels fail (timeouts, disconnects), they're skipped but remembered
+3. **Smart Resume**: When resuming, validates the entire image against the server
+4. **Missing Pixel Detection**: Finds pixels that should be there but aren't
+5. **Automatic Recovery**: Places all missing pixels to ensure 100% completion
+
+### 🔄 Enhanced Resume Commands:
 
 ```javascript
 // Check if you have a saved session
 checkSession()
 
-// Resume where you left off
+// Resume with intelligent missing pixel recovery
 resumeEmbedding()
+// Now offers two modes:
+// 1. Continue with remaining pixels only
+// 2. Validate & recover missing pixels (RECOMMENDED)
+
+// Manual validation anytime
+validateImage()
 
 // Clear saved progress (start fresh)
 clearSession()
 ```
 
-### 📱 How Resume Works:
+### 📱 How the New Resume Works:
 
 1. **Start embedding normally** with any embed command
-2. **If something goes wrong** (browser crash, refresh, disconnect):
+2. **If something goes wrong** (browser crash, refresh, network errors):
    ```javascript
    initEmbedder()  // You'll see: "🔄 Found incomplete session..."
-   resumeEmbedding()  // Continue exactly where you left off!
+   resumeEmbedding()  // Choose validation mode for 100% completion!
    ```
-3. **Automatic detection** - The script tells you when resumable sessions exist
-4. **Zero credit loss** - Resume uses the exact same queue, no wasted pixels
+3. **Intelligent Recovery** - Checks entire image for missing pixels
+4. **Zero incomplete images** - Every image is guaranteed complete
 
-### 💡 Resume Example:
+### 💡 Enhanced Resume Example:
 
 ```javascript
-// After a browser crash:
+// After network errors caused 200 pixels to fail:
 initEmbedder()
-// Output: "🔄 Found incomplete session from 12/4/2024, 3:45:23 PM"
-// Output: "📊 Progress: 150 placed, 300 remaining"
+// "🔄 Found incomplete session from 12/4/2024, 3:45:23 PM"
+// "📊 Progress: 800 placed, 200 remaining"
 
-checkSession()  // See detailed info
-// Output: "Pixels completed: 150"
-// Output: "Pixels remaining: 300" 
-// Output: "Last active: 12/4/2024, 3:45:23 PM"
+resumeEmbedding()
+// Choose option 2: "Validate & recover missing pixels"
+// System finds that 150 pixels from earlier actually failed
+// Automatically adds them back to queue
+// Final result: 100% complete image!
+```
 
-resumeEmbedding()  // Pick up where you left off!
-// Confirms and continues with remaining 300 pixels
+### 🔍 Manual Validation:
+
+```javascript
+// Check completed images for missing pixels
+validateImage()
+// "🔧 Found 23 missing pixels that need to be placed"
+// Option to place just the missing ones
 ```
 
 ---
@@ -130,7 +153,7 @@ The Solana Place canvas is **1000 pixels wide** by **1000 pixels tall**. Think o
 ```javascript
 initEmbedder()
 ```
-*This sets up the script and detects your account tier (and any resumable sessions!)*
+*This sets up the script and detects your account tier (and any resumable sessions with missing pixel recovery!)*
 
 ### Step 2: Check for Resumable Sessions
 ```javascript
@@ -192,7 +215,7 @@ Let's place a 100px image in the top-right area:
 2. **Handle any existing session:**
    ```javascript
    checkSession()        // Optional: view saved progress details
-   resumeEmbedding()     // If you want to continue previous work
+   resumeEmbedding()     // If you want to continue previous work (with missing pixel recovery!)
    // OR
    clearSession()        // If you want to start fresh
    ```
@@ -207,7 +230,7 @@ Let's place a 100px image in the top-right area:
 
 5. **Confirm** when prompted about credits
 
-6. **Wait** as it places pixels automatically (progress auto-saved every 10 pixels!)
+6. **Wait** as it places pixels automatically (progress auto-saved every 10 pixels with missing pixel recovery!)
 
 ---
 
@@ -218,9 +241,10 @@ Let's place a 100px image in the top-right area:
 - `embedImage(x, y, size)` - Place image, skip pixels that are already correct (saves credits)
 - `embedAtCenter(size)` - Place at canvas center (crowded!)
 
-### 🔄 Resume Functions (NEW!)
-- `checkSession()` - **View saved progress details**
-- `resumeEmbedding()` - **Continue interrupted embedding**
+### 🔄 Enhanced Resume Functions (NEW!)
+- `checkSession()` - **View saved progress details** (shows original pixel count)
+- `resumeEmbedding()` - **Continue with missing pixel recovery** (two modes available)
+- `validateImage()` - **Manually check for missing pixels** (works on completed images too)
 - `clearSession()` - **Delete saved progress and start fresh**
 
 ### 🔥 Canvas War Mode (Overwrites Everything!)
@@ -230,7 +254,7 @@ Let's place a 100px image in the top-right area:
 **💡 Canvas War Tip:** Use Fast mode to claim territory and overwrite enemy pixels!
 
 ### Monitoring & Control
-- `showStatus()` - Check progress and current settings (shows if resumable session exists)
+- `showStatus()` - Check progress and current settings (shows resumable session status)
 - `stopEmbedding()` - Cancel current placement (progress automatically saved)
 - `checkCredits()` - See your current credit balance
 
@@ -243,6 +267,7 @@ Let's place a 100px image in the top-right area:
 - ✅ Warn you if you don't have enough credits
 - ✅ Skip pixels that are already the correct color (saves credits!)
 - ✅ **Save progress automatically** - never lose credits to crashes!
+- ✅ **Recover missing pixels** - ensure you get 100% value for your credits!
 
 **Example:** A 60x60 image = up to 3,600 credits (but usually much less after duplicate detection)
 
@@ -270,12 +295,14 @@ This **saves you credits** and **avoids conflicts** with existing art!
 - **Rate Limits:** Mathematically impossible to hit
 - **Progress Updates:** Every 50 pixels placed
 - **💾 Auto-Save:** Progress saved every 10 pixels (crash protection)
+- **🔧 Missing Pixel Recovery:** Validates entire image for completion
 
 **Example output:**
 ```
 🎨 50 placed | 1,782 remaining | 148/min | Credits: 4,250
 🎨 100 placed | 1,732 remaining | 151/min | Credits: 4,200
 💾 Progress will be saved automatically
+🔧 Missing pixel recovery available on resume
 ```
 
 ---
@@ -305,12 +332,18 @@ This **saves you credits** and **avoids conflicts** with existing art!
 
 ### Lost Progress / Browser Crashed
 - **Solution:** Run `initEmbedder()` then `resumeEmbedding()`
+- **Choose:** Validation mode for missing pixel recovery
 - **Check:** Use `checkSession()` to see saved progress details
 - **Note:** Sessions auto-expire after 24 hours
 
 ### "No session to resume" 
 - **Cause:** No saved progress exists, or session expired (24+ hours old)
 - **Solution:** Start a new embedding with `embedImage()` or similar
+
+### Incomplete Images After Network Errors
+- **Solution:** Use `resumeEmbedding()` and choose validation mode
+- **Alternative:** Use `validateImage()` to check manually
+- **Note:** The system now automatically detects and recovers missing pixels!
 
 ---
 
@@ -326,8 +359,10 @@ This **saves you credits** and **avoids conflicts** with existing art!
 8. **🎯 Strategic placement:** Corners and edges are less contested than center
 9. **🔄 Check existing art:** Use normal mode to avoid overwriting good art
 10. **💾 Trust the auto-save:** Progress saved every 10 pixels - crashes won't hurt you!
-11. **🔄 Use resume wisely:** Continue big projects over multiple sessions
-12. **🗑️ Clean up:** Use `clearSession()` when starting completely new projects
+11. **🔄 Always use validation:** Choose missing pixel recovery when resuming
+12. **🔧 Validate completed work:** Use `validateImage()` to check old projects
+13. **🗑️ Clean up:** Use `clearSession()` when starting completely new projects
+14. **📊 Check original pixels:** `showStatus()` shows if missing pixel recovery is available
 
 ---
 
@@ -357,8 +392,9 @@ This **saves you credits** and **avoids conflicts** with existing art!
 initEmbedder()
 
 // 2. CHECK FOR RESUMABLE WORK (optional)
-checkSession()         // View saved progress
-resumeEmbedding()      // Continue where you left off
+checkSession()         // View saved progress (with original pixel count)
+resumeEmbedding()      // Continue with missing pixel recovery (RECOMMENDED: choose validation mode)
+validateImage()        // Manually check for missing pixels
 clearSession()         // Start completely fresh
 
 // 3. CHOOSE YOUR MODE:
@@ -375,8 +411,8 @@ embedImageFast(750, 50, 80)     // ATTACK top-right!
 embedAtCenterFast(100)          // BATTLE for center!
 
 // 4. USEFUL COMMANDS:
-showStatus()      // Check progress
-stopEmbedding()   // Cancel if needed
+showStatus()      // Check progress (shows missing pixel recovery status)
+stopEmbedding()   // Cancel if needed (progress auto-saved)
 checkCredits()    // See credit balance
 ```
 
@@ -406,33 +442,65 @@ embedImage(300, 300, 200)   // Large central area
 
 ---
 
-## 💾 Resume Workflow Examples
+## 💾 Enhanced Resume Workflow Examples
 
-### After Browser Crash:
+### After Network Errors Caused Missing Pixels:
 ```javascript
 initEmbedder()
 // "🔄 Found incomplete session from 12/4/2024, 3:45:23 PM"
-// "📊 Progress: 150 placed, 300 remaining"
+// "📊 Progress: 800 placed, 200 remaining"
 
-resumeEmbedding()  // Continue automatically!
+resumeEmbedding()
+// Choose option 2: "Validate & recover missing pixels (recommended)"
+// "🔍 Starting validation mode - checking for missing pixels..."
+// "🔧 Found 45 missing pixels that need to be placed"
+// "📊 Total pixels to place: 245"
+// Result: 100% complete image!
 ```
 
-### Checking Saved Progress:
+### Checking Saved Progress with Recovery Info:
 ```javascript
 checkSession()
 // "📊 Resumable Session Found:"
-// "  • Pixels completed: 150"
-// "  • Pixels remaining: 300"
+// "  • Pixels completed: 800"
+// "  • Pixels remaining: 200"
+// "  • Original pixels: 1,000"  // NEW: Shows total for validation
 // "  • Last active: 12/4/2024, 3:45:23 PM"
-// "💡 Use resumeEmbedding() to continue"
+// "💡 Use resumeEmbedding() to continue with missing pixel recovery"
+```
+
+### Manual Validation of Completed Images:
+```javascript
+validateImage()
+// "🔍 Manual validation mode - checking for missing pixels..."
+// "🔧 Found 23 missing pixels that need to be placed"
+// Confirm to place just the missing ones
+// Result: Your old incomplete images are now perfect!
 ```
 
 ### Starting Fresh:
 ```javascript
 initEmbedder()
 clearSession()        // Remove any old progress
-embedImage(100, 100, 80)  // Start new project
+embedImage(100, 100, 80)  // Start new project with full recovery support
 ```
+
+---
+
+## 🔧 Missing Pixel Recovery Benefits
+
+**Before Enhancement:**
+- Network timeouts = lost pixels forever
+- Incomplete images with holes
+- Manual re-checking required
+- Credit waste on failed pixels
+
+**After Enhancement:**
+- **🔧 Automatic Recovery:** All missing pixels found and placed
+- **💯 100% Completion:** Every image guaranteed complete
+- **💰 Zero Credit Waste:** Only pay for successfully placed pixels
+- **🔍 Smart Validation:** Checks entire original image vs server state
+- **🎯 Perfect Results:** No more incomplete artwork
 
 ---
 
