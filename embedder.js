@@ -6,7 +6,6 @@ class OptimizedPixelEmbedder {
     this.isPlacing = false;
     this.pixelsPlaced = 0;
     this.errors = 0;
-    this.skipped = 0;
     this.currentCredits = null;
     this.sessionId = null; // Track current session
     this.originalPixels = []; // Store the complete original pixel list
@@ -52,7 +51,6 @@ class OptimizedPixelEmbedder {
       originalPixels: this.originalPixels, // Save the complete original list
       pixelsPlaced: this.pixelsPlaced,
       errors: this.errors,
-      skipped: this.skipped,
       timestamp: Date.now(),
       isActive: this.isPlacing
     };
@@ -98,25 +96,10 @@ class OptimizedPixelEmbedder {
     if (saved && saved.queue && saved.queue.length > 0) {
       console.log('🔄 Found incomplete session from', new Date(saved.timestamp).toLocaleString());
       console.log(`📊 Progress: ${saved.pixelsPlaced} placed, ${saved.queue.length} remaining`);
-      console.log('💡 Use resumeEmbedding() to continue with validation, or clearSession() to start fresh');
+      console.log('💡 Use resumeEmbedding() to continue, or clearSession() to start fresh');
       return true;
     }
     return false;
-  }
-
-  // NEW: Check for missing pixels in the original image
-  async validateCompletedPixels(originalPixels) {
-    console.log('🔍 Validating completed pixels to find any that were missed...');
-    
-    const missingPixels = await this.checkPixelsInRegion(originalPixels);
-    
-    if (missingPixels.length === 0) {
-      console.log('✅ Image validation complete - no missing pixels found!');
-      return [];
-    } else {
-      console.log(`🔧 Found ${missingPixels.length} missing pixels that need to be placed`);
-      return missingPixels;
-    }
   }
 
   async resumeEmbedding() {
@@ -137,73 +120,19 @@ class OptimizedPixelEmbedder {
     this.originalPixels = saved.originalPixels || []; // Restore original pixels
     this.pixelsPlaced = saved.pixelsPlaced;
     this.errors = saved.errors;
-    this.skipped = saved.skipped;
 
     console.log(`🔄 Resuming session: ${saved.pixelsPlaced} completed, ${this.queue.length} remaining`);
     
-    // Check if we have the original pixels for validation
-    const hasOriginalPixels = this.originalPixels && this.originalPixels.length > 0;
-    
-    let proceed = false;
-    let validateMissing = false;
-    
-    if (hasOriginalPixels) {
-      const choice = prompt(
-        `Resume Previous Session?\n\n` +
-        `Pixels completed: ${saved.pixelsPlaced}\n` +
-        `Pixels remaining: ${this.queue.length}\n` +
-        `Last active: ${new Date(saved.timestamp).toLocaleString()}\n\n` +
-        `Choose resume mode:\n` +
-        `1 - Continue with remaining pixels only\n` +
-        `2 - Validate & recover any missing pixels (recommended)\n` +
-        `3 - Cancel\n\n` +
-        `Enter 1, 2, or 3:`
-      );
-      
-      if (choice === '1') {
-        proceed = true;
-        validateMissing = false;
-      } else if (choice === '2') {
-        proceed = true;
-        validateMissing = true;
-      } else {
-        console.log('❌ Resume cancelled by user');
-        return false;
-      }
-    } else {
-      const simpleChoice = confirm(
-        `Resume Previous Session?\n\n` +
-        `Pixels completed: ${saved.pixelsPlaced}\n` +
-        `Pixels remaining: ${this.queue.length}\n` +
-        `Last active: ${new Date(saved.timestamp).toLocaleString()}\n\n` +
-        `Continue embedding?`
-      );
-      
-      proceed = simpleChoice;
-      validateMissing = false;
-    }
+    const proceed = confirm(
+      `Resume Previous Session?\n\n` +
+      `Pixels completed: ${saved.pixelsPlaced}\n` +
+      `Pixels remaining: ${this.queue.length}\n` +
+      `Last active: ${new Date(saved.timestamp).toLocaleString()}\n\n` +
+      `Continue embedding?`
+    );
 
     if (proceed) {
       this.isPlacing = true;
-      
-      // If validation was requested and we have original pixels
-      if (validateMissing && this.originalPixels.length > 0) {
-        console.log('🔍 Starting validation mode - checking for missing pixels...');
-        
-        try {
-          const missingPixels = await this.validateCompletedPixels(this.originalPixels);
-          
-          if (missingPixels.length > 0) {
-            // Add missing pixels to the front of the queue
-            this.queue = [...missingPixels, ...this.queue];
-            console.log(`🔧 Added ${missingPixels.length} missing pixels to queue`);
-            console.log(`📊 Total pixels to place: ${this.queue.length}`);
-          }
-        } catch (error) {
-          console.log('⚠️ Validation failed, continuing with existing queue:', error.message);
-        }
-      }
-      
       this.processQueue();
       return true;
     } else {
@@ -218,14 +147,13 @@ class OptimizedPixelEmbedder {
     this.originalPixels = [];
     this.pixelsPlaced = 0;
     this.errors = 0;
-    this.skipped = 0;
     this.sessionId = null;
     this.isPlacing = false;
     console.log('🗑️ Session cleared');
   }
 
   // ========================================
-  // ORIGINAL FUNCTIONALITY (Enhanced with validation support)
+  // CORE FUNCTIONALITY
   // ========================================
 
   getCurrentCredits() {
@@ -258,37 +186,6 @@ class OptimizedPixelEmbedder {
       return null;
     } catch (error) {
       return null;
-    }
-  }
-
-  async checkCreditsAndConfirm(pixelsNeeded) {
-    const currentCredits = this.getCurrentCredits();
-    
-    if (currentCredits === null) {
-      const proceed = confirm(
-        `Could not determine your current credits.\n\n` +
-        `This operation will use ${pixelsNeeded} credits.\n\n` +
-        `Do you want to proceed anyway?`
-      );
-      return proceed;
-    }
-    
-    if (currentCredits >= pixelsNeeded) {
-      console.log(`✅ Sufficient credits: ${currentCredits} available, ${pixelsNeeded} needed`);
-      return true;
-    } else {
-      const deficit = pixelsNeeded - currentCredits;
-      
-      const proceed = confirm(
-        `💰 INSUFFICIENT CREDITS WARNING!\n\n` +
-        `Current credits: ${currentCredits}\n` +
-        `Pixels needed: ${pixelsNeeded}\n` +
-        `Deficit: ${deficit} credits\n\n` +
-        `⚠️ You may run out of credits partway through!\n\n` +
-        `Do you want to proceed anyway?`
-      );
-      
-      return proceed;
     }
   }
 
@@ -430,87 +327,6 @@ class OptimizedPixelEmbedder {
     });
   }
 
-  async checkPixelsInRegion(pixels) {
-    if (pixels.length === 0) return [];
-
-    const regions = this.groupPixelsIntoRegions(pixels, 50);
-    const pixelsToPlace = [];
-    
-    console.log(`🔍 Checking ${regions.length} regions instead of ${pixels.length} individual pixels...`);
-
-    for (let i = 0; i < regions.length; i++) {
-      const region = regions[i];
-      console.log(`📊 Checking region ${i + 1}/${regions.length}...`);
-      
-      try {
-        const response = await fetch(`/api/pixels/region/${region.x1}/${region.y1}/${region.x2}/${region.y2}`);
-        
-        if (response.ok) {
-          const data = await response.json();
-          const existingPixels = data.pixels || [];
-          
-          const existingMap = new Map();
-          existingPixels.forEach(pixel => {
-            existingMap.set(`${pixel.x},${pixel.y}`, pixel.color);
-          });
-          
-          region.pixels.forEach(pixel => {
-            const existing = existingMap.get(`${pixel.x},${pixel.y}`);
-            if (!existing || existing !== pixel.color) {
-              pixelsToPlace.push(pixel);
-            } else {
-              this.skipped++;
-            }
-          });
-          
-        } else if (response.status === 429) {
-          console.log(`⚠️ Rate limited on region check, adding all pixels from region`);
-          pixelsToPlace.push(...region.pixels);
-          await this.sleep(2000);
-        } else {
-          console.log(`⚠️ Could not check region, adding all pixels from region`);
-          pixelsToPlace.push(...region.pixels);
-        }
-        
-        if (i < regions.length - 1) {
-          await this.sleep(200); // Brief pause between region checks
-        }
-        
-      } catch (error) {
-        console.log(`⚠️ Error checking region, adding all pixels from region:`, error.message);
-        pixelsToPlace.push(...region.pixels);
-      }
-    }
-
-    console.log(`✅ Check complete: ${pixelsToPlace.length} pixels need placement, ${this.skipped} already correct`);
-    return pixelsToPlace;
-  }
-
-  groupPixelsIntoRegions(pixels, regionSize = 50) {
-    const regions = [];
-    const regionMap = new Map();
-    
-    pixels.forEach(pixel => {
-      const regionX = Math.floor(pixel.x / regionSize) * regionSize;
-      const regionY = Math.floor(pixel.y / regionSize) * regionSize;
-      const regionKey = `${regionX},${regionY}`;
-      
-      if (!regionMap.has(regionKey)) {
-        regionMap.set(regionKey, {
-          x1: regionX,
-          y1: regionY,
-          x2: Math.min(regionX + regionSize - 1, 2999),
-          y2: Math.min(regionY + regionSize - 1, 1999),
-          pixels: []
-        });
-      }
-      
-      regionMap.get(regionKey).pixels.push(pixel);
-    });
-    
-    return Array.from(regionMap.values());
-  }
-
   async placePixel(x, y, color) {
     return new Promise((resolve, reject) => {
       const event = new CustomEvent('placePixelFromScript', {
@@ -584,9 +400,8 @@ class OptimizedPixelEmbedder {
     });
   }
 
-  async embedImage(pixels, checkExisting = true) {
-    console.log(`🚀 Starting image embedding...`);
-    console.log(`🔍 Check existing pixels: ${checkExisting}`);
+  async embedImage(pixels) {
+    console.log(`🚀 Starting r/place style embedding - will overwrite existing pixels!`);
     console.log(`⚡ Using universal ${this.universalDelay}ms delays for maximum safety`);
 
     if (this.isPlacing) {
@@ -599,32 +414,43 @@ class OptimizedPixelEmbedder {
       await this.sleep(300);
     }
 
+    if (pixels.length === 0) {
+      console.log('❌ No pixels to place!');
+      return;
+    }
+
+    // Check credits before starting
+    const currentCredits = this.getCurrentCredits();
+    if (currentCredits !== null) {
+      if (currentCredits < pixels.length) {
+        const deficit = pixels.length - currentCredits;
+        const proceed = confirm(
+          `💰 INSUFFICIENT CREDITS WARNING!\n\n` +
+          `Current credits: ${currentCredits}\n` +
+          `Pixels needed: ${pixels.length}\n` +
+          `Deficit: ${deficit} credits\n\n` +
+          `⚠️ You may run out of credits partway through!\n\n` +
+          `Do you want to proceed anyway?`
+        );
+        
+        if (!proceed) {
+          console.log('❌ Embedding cancelled due to insufficient credits');
+          return;
+        }
+      } else {
+        console.log(`✅ Sufficient credits: ${currentCredits} available, ${pixels.length} needed`);
+      }
+    }
+
     // Create new session and store original pixels
     this.sessionId = this.generateSessionId();
     this.originalPixels = [...pixels]; // Store the complete original list
     this.pixelsPlaced = 0;
     this.errors = 0;
-    this.skipped = 0;
     this.burstTracker = [];
     this.lastRequestTime = null;
-    let finalPixels = pixels;
 
-    if (checkExisting && pixels.length > 10) {
-      try {
-        finalPixels = await this.checkPixelsInRegion(pixels);
-        console.log(`💰 Final pixels needed: ${finalPixels.length} (after filtering existing)`);
-      } catch (error) {
-        console.log('⚠️ Error during region check, proceeding with all pixels:', error.message);
-        finalPixels = pixels;
-      }
-    }
-
-    if (finalPixels.length === 0) {
-      console.log('🎉 All pixels already correct! Nothing to do.');
-      return;
-    }
-
-    this.queue = [...finalPixels];
+    this.queue = [...pixels];
     this.isPlacing = true;
     
     const pixelsPerMinute = Math.floor(60000 / this.universalDelay);
@@ -633,7 +459,6 @@ class OptimizedPixelEmbedder {
     console.log(`🎯 Starting placement of ${this.queue.length} pixels...`);
     console.log(`⏱️ Estimated time: ${estimatedTime} minutes at 150 pixels/min`);
     console.log(`💾 Progress will be saved automatically`);
-    console.log(`🔧 Missing pixel recovery available on resume`);
 
     // Save initial progress (including original pixels)
     this.saveProgress();
@@ -715,13 +540,12 @@ class OptimizedPixelEmbedder {
     const finalCredits = this.getCurrentCredits();
     console.log('\n🎉 ===== COMPLETE =====');
     console.log(`✅ Pixels placed: ${this.pixelsPlaced}`);
-    console.log(`⏭️ Pixels skipped: ${this.skipped}`);
     console.log(`❌ Errors: ${this.errors}`);
     console.log(`💰 Credits remaining: ${finalCredits || 'Unknown'}`);
     
     if (this.queue.length > 0) {
       console.log(`🔄 Pixels remaining: ${this.queue.length}`);
-      console.log(`💡 Use resumeEmbedding() to continue with missing pixel recovery`);
+      console.log(`💡 Use resumeEmbedding() to continue`);
     }
     
     console.log('======================\n');
@@ -737,7 +561,6 @@ class OptimizedPixelEmbedder {
       originalPixelsCount: this.originalPixels.length,
       pixelsPlaced: this.pixelsPlaced,
       errors: this.errors,
-      skipped: this.skipped,
       currentRate: this.requestTimes.length,
       tier: this.currentTier,
       burstUsed: burstUsed,
@@ -755,7 +578,7 @@ class OptimizedPixelEmbedder {
 }
 
 // ========================================
-// INTERFACE (Enhanced with Missing Pixel Recovery)
+// INTERFACE
 // ========================================
 
 let embedder = null;
@@ -763,7 +586,7 @@ let embedder = null;
 function initEmbedder() {
   console.log('🚀 Initializing Pixel Embedder...');
   embedder = new OptimizedPixelEmbedder();
-  console.log('✅ Embedder ready! Tuned for high-performance server.');
+  console.log('✅ Embedder ready! r/place style - will overwrite existing pixels.');
   
   const credits = embedder.getCurrentCredits();
   if (credits !== null) {
@@ -819,77 +642,14 @@ function embedImage(startX = 100, startY = 100, maxWidth = 50) {
         message += `Could not detect current credits\n\n`;
       }
       
-      message += `Will check existing pixels first\n💾 Progress will be saved for resume\n🔧 Missing pixel recovery available\nProceed with embedding?`;
+      message += `Will overwrite any existing pixels (r/place style)\n💾 Progress will be saved for resume\nProceed with embedding?`;
       
       const proceed = confirm(message);
       
       if (proceed) {
-        await embedder.embedImage(pixels, true);
+        await embedder.embedImage(pixels);
       } else {
         console.log('❌ Embedding cancelled by user');
-      }
-      
-    } catch (error) {
-      console.error('❌ Error processing image:', error.message);
-    } finally {
-      document.body.removeChild(input);
-    }
-  };
-  
-  input.click();
-}
-
-function embedImageFast(startX = 100, startY = 100, maxWidth = 50) {
-  if (!embedder) {
-    console.log('❌ Please run initEmbedder() first');
-    return;
-  }
-
-  console.log('📂 Opening file picker for FAST embedding...');
-  
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/png,image/jpg,image/jpeg';
-  input.style.display = 'none';
-  document.body.appendChild(input);
-  
-  input.onchange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) {
-      document.body.removeChild(input);
-      return;
-    }
-
-    try {
-      const pixels = await embedder.loadImage(file, startX, startY, maxWidth);
-      
-      if (pixels.length === 0) {
-        console.log('❌ No visible pixels found in image');
-        document.body.removeChild(input);
-        return;
-      }
-
-      const currentCredits = embedder.getCurrentCredits();
-      let message = `FAST EMBED: ${pixels.length} pixels at (${startX}, ${startY})\n\n`;
-      
-      if (currentCredits !== null) {
-        message += `Current credits: ${currentCredits}\n`;
-        if (currentCredits < pixels.length) {
-          const deficit = pixels.length - currentCredits;
-          message += `⚠️ INSUFFICIENT CREDITS!\n`;
-          message += `Deficit: ${deficit} credits\n`;
-          message += `You may run out partway through!\n\n`;
-        }
-      } else {
-        message += `Could not detect current credits\n\n`;
-      }
-      
-      message += `Will NOT check existing pixels\n💾 Progress will be saved for resume\n🔧 Missing pixel recovery available\nProceed with fast embedding?`;
-      
-      const proceed = confirm(message);
-      
-      if (proceed) {
-        await embedder.embedImage(pixels, false);
       }
       
     } catch (error) {
@@ -912,18 +672,8 @@ function embedAtCenter(maxWidth = 200) {
   embedImage(centerX, centerY, maxWidth);
 }
 
-function embedAtCenterFast(maxWidth = 200) {
-  const canvasWidth = 1000;
-  const canvasHeight = 1000;
-  const centerX = Math.floor((canvasWidth - maxWidth) / 2);
-  const centerY = Math.floor((canvasHeight - maxWidth) / 2);
-  
-  console.log(`🎯 FAST centering image at (${centerX}, ${centerY}) with max size ${maxWidth}px`);
-  embedImageFast(centerX, centerY, maxWidth);
-}
-
 // ========================================
-// ENHANCED RESUME FUNCTIONS
+// RESUME FUNCTIONS
 // ========================================
 
 function resumeEmbedding() {
@@ -959,7 +709,7 @@ function checkSession() {
     console.log(`  • Errors encountered: ${saved.errors}`);
     console.log(`  • Last active: ${new Date(saved.timestamp).toLocaleString()}`);
     console.log(`  • Session ID: ${saved.sessionId}`);
-    console.log('💡 Use resumeEmbedding() to continue with missing pixel recovery');
+    console.log('💡 Use resumeEmbedding() to continue');
     return saved;
   } else {
     console.log('❌ No resumable session found');
@@ -967,58 +717,8 @@ function checkSession() {
   }
 }
 
-// NEW: Manual validation function
-function validateImage() {
-  if (!embedder) {
-    console.log('❌ Please run initEmbedder() first');
-    return;
-  }
-  
-  const saved = embedder.loadProgress();
-  if (!saved || !saved.originalPixels || saved.originalPixels.length === 0) {
-    console.log('❌ No original pixels found. Can only validate if you have a saved session with original image data.');
-    return;
-  }
-  
-  console.log('🔍 Manual validation mode - checking for missing pixels...');
-  
-  // Temporarily restore the original pixels
-  const originalPixels = saved.originalPixels;
-  
-  embedder.validateCompletedPixels(originalPixels).then(missingPixels => {
-    if (missingPixels.length === 0) {
-      console.log('✅ Validation complete - no missing pixels found! Your image is complete.');
-    } else {
-      console.log(`🔧 Found ${missingPixels.length} missing pixels that need to be placed`);
-      
-      const proceed = confirm(
-        `Validation Results:\n\n` +
-        `Missing pixels found: ${missingPixels.length}\n` +
-        `These pixels failed to place during the original embedding.\n\n` +
-        `Do you want to place the missing pixels now?`
-      );
-      
-      if (proceed) {
-        // Create a new session just for the missing pixels
-        embedder.sessionId = embedder.generateSessionId();
-        embedder.originalPixels = originalPixels;
-        embedder.queue = missingPixels;
-        embedder.pixelsPlaced = saved.pixelsPlaced; // Keep the original count
-        embedder.errors = saved.errors;
-        embedder.skipped = saved.skipped;
-        embedder.isPlacing = true;
-        
-        console.log(`🔧 Starting placement of ${missingPixels.length} missing pixels...`);
-        embedder.processQueue();
-      }
-    }
-  }).catch(error => {
-    console.error('❌ Error during validation:', error.message);
-  });
-}
-
 // ========================================
-// ORIGINAL INTERFACE FUNCTIONS
+// UTILITY FUNCTIONS
 // ========================================
 
 function showStatus() {
@@ -1059,8 +759,9 @@ function checkCredits() {
 }
 
 // Startup message
-console.log('🚀 Solana Place Pixel Embedder Ready (with Missing Pixel Recovery)');
-console.log('⚡ Speed: 150 pixels/min | 🛡️ Burst-safe: 15/10s | 💾 Auto-save progress | 🔧 Missing pixel recovery');
+console.log('🚀 Solana Place Pixel Embedder Ready - r/place Style');
+console.log('⚡ Speed: 150 pixels/min | 🛡️ Burst-safe: 15/10s | 💾 Auto-save progress');
+console.log('🔥 OVERWRITES existing pixels - true r/place style!');
 console.log('');
 console.log('📍 USAGE:');
 console.log('1. initEmbedder()  - Initialize first');
@@ -1072,32 +773,23 @@ console.log('     - embedImage(100, 100, 150)  - Top-left area');
 console.log('     - embedImage(2000, 500, 100)  - Right side');
 console.log('     - embedImage(800, 1500, 200)  - Bottom area');
 console.log('');
-console.log('🔄 ENHANCED RESUME FEATURES:');
-console.log('   • resumeEmbedding()  - Continue with missing pixel recovery');
-console.log('   • validateImage()    - Check for missing pixels manually');
+console.log('🔄 RESUME FEATURES:');
+console.log('   • resumeEmbedding()  - Continue interrupted session');
 console.log('   • checkSession()     - View saved progress');
 console.log('   • clearSession()     - Delete saved progress');
 console.log('');
-console.log('🔧 MISSING PIXEL RECOVERY:');
-console.log('   • Automatically detects pixels that failed during placement');
-console.log('   • Validates the entire image when resuming');
-console.log('   • Ensures your image is always complete, even after network errors');
-console.log('');
 console.log('🎯 Canvas size: 1000x1000 pixels');
-console.log('✅ Pick your spot and avoid the crowd!');
+console.log('⚔️ True r/place style - your pixels will overwrite others!');
+console.log('🛡️ Others can overwrite yours too - defend your territory!');
 console.log('💾 Progress automatically saved every 10 pixels');
-console.log('🔧 Missing pixels will be recovered on resume!');
 
 // Export functions
 window.initEmbedder = initEmbedder;
 window.embedImage = embedImage;
-window.embedImageFast = embedImageFast;
 window.embedAtCenter = embedAtCenter;
-window.embedAtCenterFast = embedAtCenterFast;
 window.showStatus = showStatus;
 window.stopEmbedding = stopEmbedding;
 window.checkCredits = checkCredits;
 window.resumeEmbedding = resumeEmbedding;
 window.clearSession = clearSession;
 window.checkSession = checkSession;
-window.validateImage = validateImage;
